@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MouseMode", "MouseMode\MouseMode.csproj", "{D13729DA-E882-4D2B-BD43-3CA07E1A2B06}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenTabletDriver.Plugin", ".modules\OpenTabletDriver\OpenTabletDriver.Plugin\OpenTabletDriver.Plugin.csproj", "{272B176F-6E2B-4406-A85E-6460A5552471}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D13729DA-E882-4D2B-BD43-3CA07E1A2B06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D13729DA-E882-4D2B-BD43-3CA07E1A2B06}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D13729DA-E882-4D2B-BD43-3CA07E1A2B06}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D13729DA-E882-4D2B-BD43-3CA07E1A2B06}.Release|Any CPU.Build.0 = Release|Any CPU
+		{272B176F-6E2B-4406-A85E-6460A5552471}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{272B176F-6E2B-4406-A85E-6460A5552471}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{272B176F-6E2B-4406-A85E-6460A5552471}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{272B176F-6E2B-4406-A85E-6460A5552471}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
