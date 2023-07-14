@@ -4,6 +4,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MouseMode", "MouseMode\Mous
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenTabletDriver.Plugin", ".modules\OpenTabletDriver\OpenTabletDriver.Plugin\OpenTabletDriver.Plugin.csproj", "{272B176F-6E2B-4406-A85E-6460A5552471}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenTabletDriver", ".modules\OpenTabletDriver\OpenTabletDriver\OpenTabletDriver.csproj", "{8CFCBA91-A678-4861-80F4-BC0A6EE8745C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenTabletDriver.Configurations", ".modules\OpenTabletDriver\OpenTabletDriver.Configurations\OpenTabletDriver.Configurations.csproj", "{D58E0EBA-4A6A-4E11-8297-FC9E7FE42C7A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenTabletDriver.Native", ".modules\OpenTabletDriver\OpenTabletDriver.Native\OpenTabletDriver.Native.csproj", "{4A10B674-E019-4A9C-884B-A869AC72249A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +24,17 @@ Global
 		{272B176F-6E2B-4406-A85E-6460A5552471}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{272B176F-6E2B-4406-A85E-6460A5552471}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{272B176F-6E2B-4406-A85E-6460A5552471}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8CFCBA91-A678-4861-80F4-BC0A6EE8745C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8CFCBA91-A678-4861-80F4-BC0A6EE8745C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8CFCBA91-A678-4861-80F4-BC0A6EE8745C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8CFCBA91-A678-4861-80F4-BC0A6EE8745C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D58E0EBA-4A6A-4E11-8297-FC9E7FE42C7A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D58E0EBA-4A6A-4E11-8297-FC9E7FE42C7A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D58E0EBA-4A6A-4E11-8297-FC9E7FE42C7A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D58E0EBA-4A6A-4E11-8297-FC9E7FE42C7A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4A10B674-E019-4A9C-884B-A869AC72249A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4A10B674-E019-4A9C-884B-A869AC72249A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4A10B674-E019-4A9C-884B-A869AC72249A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4A10B674-E019-4A9C-884B-A869AC72249A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
