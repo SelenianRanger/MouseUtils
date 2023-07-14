@@ -41,8 +41,22 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
     [Property("Acceleration Intensity"), DefaultPropertyValue(1f)]
     public float AccelerationIntensity { get; set; }
 
+    [TabletReference] 
+    public TabletReference TabletRef { get; set; }
+
+    [Resolved] 
+    public IDriver DriverRef { get; set; }
+    
+    private DigitizerSpecifications Digitizer;
+    private Vector2 MaxDigitizerCoords;
+    private Vector2 DigitizerSize;
+
+    private AbsoluteOutputMode? OutputMode = null;
+    private bool bAbsIgnoreOobInput;
+    private bool bAbsClampOobInput;
+    
     private TimeSpan ResetTimeSpan;
-    private HPETDeltaStopwatch stopwatch = new HPETDeltaStopwatch(true);
+    private HPETDeltaStopwatch Stopwatch = new HPETDeltaStopwatch(true);
 
     private Vector2 MinCoords;
     private Vector2 MaxCoords;
@@ -50,34 +64,25 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
     private Vector2 AspectRatioConversionRatio;
     private Vector2 TabletToPhysicialCoordRatio;
 
-    private Vector2 LastPos = Vector2.Zero;
-    private Vector2 LastLocalPos = Vector2.Zero;
-
-    [TabletReference] 
-    public TabletReference TabletRef { get; set; }
-
-    [Resolved] 
-    public IDriver DriverRef { get; set; }
-
-    private AbsoluteOutputMode? OutputMode = null;
-    private bool bAbsIgnoreOobInput;
-    private bool bAbsClampOobInput;
+    private Vector2 LastPos;
+    private Vector2 LastLocalPos;
 
     [OnDependencyLoad]
     public void Recompile()
     {
         OutputMode = null;
-        CanvasOrigin = Vector2.Zero;
 
         ResetTimeSpan = new TimeSpan(0, 0, 0, 0, ResetTime);
         
-        var digitizer = TabletRef.Properties.Specifications.Digitizer;
-        TabletToPhysicialCoordRatio = new Vector2(
-            digitizer.Width / digitizer.MaxX,
-            digitizer.Height / digitizer.MaxY);
-        TabletToPhysicialCoordRatio /= 25.4f; // convert mm to inch to fit curve values
-        
+        Digitizer = TabletRef.Properties.Specifications.Digitizer;
+        DigitizerSize = new Vector2(Digitizer.Width, Digitizer.Height);
+        MaxDigitizerCoords = new Vector2(Digitizer.MaxX, Digitizer.MaxY);
+        TabletToPhysicialCoordRatio = DigitizerSize / MaxDigitizerCoords;
+
         AspectRatioConversionRatio = Vector2.Zero; // reset on next report
+
+        CanvasOrigin = MaxDigitizerCoords / 2f;
+        LastLocalPos = Vector2.Zero;
     }
     
     public void Consume(IDeviceReport report)
@@ -108,7 +113,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
             return;
 
         // check for reset timeout
-        var deltaTime = stopwatch.Restart();
+        var deltaTime = Stopwatch.Restart();
         if (ResetTime >= 0 && deltaTime >= ResetTimeSpan)
         {
             ResetCanvas(newPosition);
@@ -117,7 +122,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         // calculate, scale and apply displacement
         var displacement = ScaleDisplacement(newPosition - LastPos, (float)deltaTime.TotalSeconds);
         var transformedPos = Vector2.Clamp( LastLocalPos + CanvasOrigin + displacement,
-            Vector2.Zero, MaxCoords);
+            Vector2.Zero, MaxDigitizerCoords);
 
         // save final coordinates and report
         tabletReport.Position = transformedPos;
@@ -143,42 +148,32 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         if (OutputMode == null)
         {
             Log.WriteNotify("Mouse Mode", "Absolute output mode not found.", LogLevel.Error);
-            return false;
+            throw new Exception("Absolute output mode not found");
         }
-        
-        var digitizer = TabletRef.Properties.Specifications.Digitizer;
-        var maxDigitizerCoords = new Vector2(digitizer.MaxX, digitizer.MaxY);
         
         bAbsIgnoreOobInput = OutputMode.AreaLimiting;
         bAbsClampOobInput = OutputMode.AreaClipping || bAbsIgnoreOobInput;
-
+        
         var canvasSize = new Vector2(OutputMode.Input.Width, OutputMode.Input.Height);
         MinCoords = OutputMode.Input.Position - canvasSize / 2;
         MaxCoords = MinCoords + canvasSize;
-        
-        // transform to digitizer coordinate space
-        MinCoords *= maxDigitizerCoords / canvasSize;
-        MaxCoords *= maxDigitizerCoords / canvasSize;
 
-        Log.Debug("Mouse Mode", "Min: " + MinCoords + "\tMax: " + MaxCoords);
+        // transform to digitizer coordinate space
+        MinCoords /= TabletToPhysicialCoordRatio;
+        MaxCoords /= TabletToPhysicialCoordRatio;
 
         return true;
     }
 
     private Vector2 ClampInput(Vector2 pos)
     {
-        var digitizer = TabletRef.Properties.Specifications.Digitizer;
-        var maxDigitizerCoords = new Vector2(digitizer.MaxX, digitizer.MaxY);
-        
-        if (bDropOutOfBoundsReports && !IsWithin(pos, Vector2.Zero, maxDigitizerCoords))
+        if (bDropOutOfBoundsReports && !IsWithin(pos, Vector2.Zero, MaxDigitizerCoords))
         {
-            Log.Debug("Mouse Mode", pos + "Out of Bounds");
             return Vector2.Zero;
         }
 
         if (bAbsClampOobInput && !IsWithin(pos, MinCoords, MaxCoords))
         {
-            Log.Debug("Mouse Mode", pos + "Out of Work Area");
             if (bAbsIgnoreOobInput)
             {
                 return Vector2.Zero;
@@ -198,11 +193,11 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
 
     private Vector2 ScaleDisplacement(Vector2 displacement, float deltaTime)
     {
-        float velocity = (displacement * TabletToPhysicialCoordRatio).Length() / deltaTime;
+        float velocity = (displacement * TabletToPhysicialCoordRatio / 25.4f).Length() / deltaTime; // convert mm/s to inch/s
         float accelerationMultiplier = 1f;
         if (bMouseAccelerationEnabled)
         {
-            accelerationMultiplier = MouseAcceleration.GetMultiplier(velocity) * (float)Math.Sqrt(AccelerationIntensity) / 5; // divide to compensate for larger pen movement compared to mouse;
+            accelerationMultiplier = MouseAcceleration.GetMultiplier(velocity) * (float)Math.Sqrt(AccelerationIntensity) / 8; // divide to compensate for larger pen movement compared to mouse;
         }
         
         return displacement * GetAspectRatioConversionVector() * accelerationMultiplier * SpeedMultiplier;
@@ -223,13 +218,12 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
 
     private Vector2 CalculateAspectRatioConversionVector()
     {
-        var digitizer = TabletRef.Properties.Specifications.Digitizer;
         Area outputArea = OutputMode.Output;
         Area inputArea = OutputMode.Input;
            
         float outputAspectRatio = Math.Abs(outputArea.Width / outputArea.Height);
         float inputAspectRatio = Math.Abs(inputArea.Width / inputArea.Height);
-        float tabletAspectRatio = digitizer.Width / digitizer.Height;
+        float tabletAspectRatio = Digitizer.Width / Digitizer.Height;
         float customAspectRatio = CustomAspectRatioX / CustomAspectRatioY;
         
         float targetAspectRatio = bCustomAspectRatioEnabled ? customAspectRatio : outputAspectRatio;
