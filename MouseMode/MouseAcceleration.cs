@@ -15,6 +15,7 @@ public static class MouseAcceleration
         new Vector2(40, 568)
     };
     
+    /// <returns>Velocity value of the acceleration curve based on <c>input</c></returns>
     public static float GetValue(float input)
     {
         int i = 1;
@@ -22,7 +23,8 @@ public static class MouseAcceleration
         float interpRatio = (input - AccCurve[i - 1].X) / (AccCurve[i].X - AccCurve[i - 1].X);
         return Vector2.Lerp(AccCurve[i-1], AccCurve[i], interpRatio).Y;
     }
-
+    
+    /// <returns>Multiplier applied to velocity based on <c>input</c></returns>
     public static float GetMultiplier(float input)
     {
         return IsNearly(input, 0f, 0.1f) ? 0 : GetValue(input) / input;
