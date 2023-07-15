@@ -60,6 +60,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
 
     private Vector2 MinCoords;
     private Vector2 MaxCoords;
+    private float CanvasRotation;
     private Vector2 CanvasOrigin;
     private Vector2 AspectRatioConversionRatio;
     private Vector2 TabletToPhysicialCoordRatio;
@@ -161,6 +162,8 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         // transform to digitizer coordinate space
         MinCoords /= TabletToPhysicialCoordRatio;
         MaxCoords /= TabletToPhysicialCoordRatio;
+        
+        CanvasRotation = OutputMode.Input.Rotation;
 
         return true;
     }
@@ -172,13 +175,13 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
             return Vector2.Zero;
         }
 
-        if (bAbsClampOobInput && !IsWithin(pos, MinCoords, MaxCoords))
+        if (bAbsClampOobInput && !IsWithin(pos, MinCoords, MaxCoords, CanvasRotation))
         {
             if (bAbsIgnoreOobInput)
             {
                 return Vector2.Zero;
             }
-            return Vector2.Clamp(pos, MinCoords, MaxCoords);
+            return Clamp(pos, MinCoords, MaxCoords, CanvasRotation);
         }
         
         return pos;
@@ -199,7 +202,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         {
             accelerationMultiplier = MouseAcceleration.GetMultiplier(velocity) * (float)Math.Sqrt(AccelerationIntensity) / 8; // divide to compensate for larger pen movement compared to mouse;
         }
-        
+
         return displacement * GetAspectRatioConversionVector() * accelerationMultiplier * SpeedMultiplier;
     }
 
