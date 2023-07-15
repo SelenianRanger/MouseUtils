@@ -1,5 +1,4 @@
 using System.Numerics;
-using OpenTabletDriver.Plugin;
 
 namespace MouseMode;
 
@@ -10,7 +9,6 @@ public static class MouseModeStatics
     {
         return Math.Abs(A - B) < error;
     }
-    
     
     /// <returns>Whether point P falls withing the boundary of the rectangle defined by corners X and Y, rotated by rotation</returns>
     public static bool IsWithin(Vector2 P, Vector2 X, Vector2 Y, float rotation = 0f)
@@ -26,10 +24,10 @@ public static class MouseModeStatics
                    X2.Y < P.Y && P.Y < Y2.Y;
         }
 
-        float rot = rotation * (float)Math.PI / 180f;
+        float rot = Deg2Rad(rotation);
         
-        Vector2 A = X + new Vector2(XY.X, 0f);
-        Vector2 B = X + new Vector2(0f, XY.Y);
+        Vector2 A = X + XY with { Y = 0f };
+        Vector2 B = X + XY with { X = 0f };
         Matrix3x2 rotMatrix = Matrix3x2.CreateRotation(rot, pivot);
 
         Vector2 Xrot = Vector2.Transform(X, rotMatrix);
@@ -61,10 +59,10 @@ public static class MouseModeStatics
             return Vector2.Clamp(P, pivot - Flip(XY) / 2, pivot + Flip(XY) / 2);
         }
         
-        float rot = rotation * (float)Math.PI / 180f;
+        float rot = Deg2Rad(rotation);
         
-        Vector2 A = X + new Vector2(XY.X, 0f);
-        Vector2 B = X + new Vector2(0f, XY.Y);
+        Vector2 A = X + XY with { Y = 0f };
+        Vector2 B = X + XY with { X = 0f };
         Matrix3x2 rotMatrix = Matrix3x2.CreateRotation(rot, pivot);
 
         Vector2 Xrot = Vector2.Transform(X, rotMatrix);
@@ -77,11 +75,17 @@ public static class MouseModeStatics
 
         float clampedX = Math.Clamp(Vector2.Dot(XArot, XProt) / XArot.Length(), 0f, XArot.Length());
         float clampedY = Math.Clamp(Vector2.Dot(XBrot, XProt) / XBrot.Length(), 0f, XBrot.Length());
-        return new Vector2(clampedX, clampedY) + Xrot;
+        
+        return clampedX * Vector2.Normalize(XArot) + clampedY * Vector2.Normalize(XBrot) + Xrot;
     }
 
     public static Vector2 Flip(Vector2 vector)
     {
         return new Vector2(vector.Y, vector.X);
+    }
+
+    public static float Deg2Rad(float degrees)
+    {
+        return degrees * (float)Math.PI / 180f;
     }
 }

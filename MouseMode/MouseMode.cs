@@ -22,15 +22,9 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
     [BooleanProperty("Drop Input Outside Full Tablet Area", ""), DefaultPropertyValue(true)]
     public bool bDropOutOfBoundsReports { get; set; }
     
-    [BooleanProperty("Enable Custom Aspect Ratio", ""), DefaultPropertyValue(true)]
-    public bool bCustomAspectRatioEnabled { get; set; }
-    
-    [Property("Custom Aspect Ratio X"), DefaultPropertyValue(16f)]
-    public float CustomAspectRatioX { get; set; }
-    
-    [Property("Custom Aspect Ratio Y"), DefaultPropertyValue(9f)]
-    public float CustomAspectRatioY { get; set; }
-    
+    [BooleanProperty("Normalize Aspect Ratio", ""), DefaultPropertyValue(true)]
+    public bool bNormalizeAspectRatio { get; set; }
+
     [Property("Speed Multiplier"), DefaultPropertyValue(1f)]
     public float SpeedMultiplier { get; set; }
 
@@ -62,7 +56,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
     private Vector2 MaxCoords;
     private float CanvasRotation;
     private Vector2 CanvasOrigin;
-    private Vector2 AspectRatioConversionRatio;
+    private Matrix3x2 AspectRatioConversionRatio;
     private Vector2 TabletToPhysicialCoordRatio;
 
     private Vector2 LastPos;
@@ -79,8 +73,6 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         DigitizerSize = new Vector2(Digitizer.Width, Digitizer.Height);
         MaxDigitizerCoords = new Vector2(Digitizer.MaxX, Digitizer.MaxY);
         TabletToPhysicialCoordRatio = DigitizerSize / MaxDigitizerCoords;
-
-        AspectRatioConversionRatio = Vector2.Zero; // reset on next report
 
         CanvasOrigin = MaxDigitizerCoords / 2f;
         LastLocalPos = Vector2.Zero;
@@ -164,6 +156,9 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         MaxCoords /= TabletToPhysicialCoordRatio;
         
         CanvasRotation = OutputMode.Input.Rotation;
+        
+        // call to set initial value
+        AspectRatioConversionRatio = bNormalizeAspectRatio ? CalculateAspectRatioConversionVector() : Matrix3x2.Identity;
 
         return true;
     }
@@ -202,40 +197,30 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         {
             accelerationMultiplier = MouseAcceleration.GetMultiplier(velocity) * (float)Math.Sqrt(AccelerationIntensity) / 8; // divide to compensate for larger pen movement compared to mouse;
         }
-
-        return displacement * GetAspectRatioConversionVector() * accelerationMultiplier * SpeedMultiplier;
+        
+        return Vector2.Transform(displacement, AspectRatioConversionRatio) * accelerationMultiplier * SpeedMultiplier;
     }
 
-    private Vector2 GetAspectRatioConversionVector()
-    {
-        if (AspectRatioConversionRatio != Vector2.Zero)
-        {
-            // return previously calculated value
-            return AspectRatioConversionRatio;
-        }
-
-        // only calculated the first time OutputMode is found
-        AspectRatioConversionRatio = CalculateAspectRatioConversionVector();
-        return AspectRatioConversionRatio;
-    }
-
-    private Vector2 CalculateAspectRatioConversionVector()
+    private Matrix3x2 CalculateAspectRatioConversionVector()
     {
         Area outputArea = OutputMode.Output;
         Area inputArea = OutputMode.Input;
-           
+
         float outputAspectRatio = Math.Abs(outputArea.Width / outputArea.Height);
         float inputAspectRatio = Math.Abs(inputArea.Width / inputArea.Height);
-        float tabletAspectRatio = Digitizer.Width / Digitizer.Height;
-        float customAspectRatio = CustomAspectRatioX / CustomAspectRatioY;
         
-        float targetAspectRatio = bCustomAspectRatioEnabled ? customAspectRatio : outputAspectRatio;
+        Vector2 scale = (inputAspectRatio < outputAspectRatio)
+            ? new Vector2(inputAspectRatio / outputAspectRatio, 1f)
+            : new Vector2(1f, outputAspectRatio / inputAspectRatio);
+        
+        float angle = Deg2Rad(CanvasRotation);
 
-        targetAspectRatio *= inputAspectRatio;
-        outputAspectRatio *= tabletAspectRatio;
-        
-        return (targetAspectRatio > outputAspectRatio)
-            ? new Vector2(1f, outputAspectRatio / targetAspectRatio)
-            : new Vector2(targetAspectRatio / outputAspectRatio, 1f);
+        Matrix3x2 conversionMatrix = Matrix3x2.CreateRotation(-angle);              // rotate backwards
+        conversionMatrix = Matrix3x2.CreateScale(scale) * conversionMatrix;         // scale
+        conversionMatrix = Matrix3x2.CreateRotation(angle) * conversionMatrix;      // rotate forwards to original
+    
+        Log.Debug("Mouse Mode", conversionMatrix.ToString());
+
+        return conversionMatrix;
     }
 }
