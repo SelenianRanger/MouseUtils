@@ -53,7 +53,6 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
     private HPETDeltaStopwatch Stopwatch = new HPETDeltaStopwatch(true);
 
     private float CanvasRotation;
-    private Matrix3x2 CanvasRotationMatrix;
     private Vector2 CanvasOrigin;
     private Vector2 MinCoords;
     private Vector2 MaxCoords;
@@ -159,10 +158,9 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         
         // get rotation data
         CanvasRotation = OutputMode.Input.Rotation;
-        CanvasRotationMatrix = Matrix3x2.CreateRotation(Deg2Rad(CanvasRotation));
 
         // call to set initial value
-        AspectRatioNormalizationMatrix = bNormalizeAspectRatio ? GetAspectRatioNormalizationVector() : Matrix3x2.Identity;
+        AspectRatioNormalizationMatrix = bNormalizeAspectRatio ? GetAspectRatioNormalizationMatrix() : Matrix3x2.Identity;
 
         return true;
     }
@@ -202,21 +200,23 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
             accelerationMultiplier = MouseAcceleration.GetMultiplier(velocity) * (float)Math.Sqrt(AccelerationIntensity) / 8; // divide to compensate for larger pen movement compared to mouse;
         }
         
-        displacement = Vector2.Transform(displacement, AspectRatioNormalizationMatrix);
-        return  displacement * accelerationMultiplier * SpeedMultiplier;
+        return  Vector2.Transform(displacement, AspectRatioNormalizationMatrix) * accelerationMultiplier * SpeedMultiplier;
     }
 
-    private Matrix3x2 GetAspectRatioNormalizationVector()
+    private Matrix3x2 GetAspectRatioNormalizationMatrix()
     {
-        DecomposeMatrix(OutputMode.TransformationMatrix, 
-            out _, out var scaleMat, out var rotationMat);
+        var transformMat = OutputMode.TransformationMatrix with { M31 = 0, M32 = 0 }; // get output linear transform
+        Matrix3x2.Invert(transformMat, out var invTransform);
 
-        Vector2 scale = (scaleMat.M11 < scaleMat.M22)
-            ? new Vector2(1f, scaleMat.M11 / scaleMat.M22)
-            : new Vector2(scaleMat.M22 / scaleMat.M11, 1f);
+        var inputArea = OutputMode.Input;
+        var outputArea = OutputMode.Output;
 
-        Matrix3x2.Invert(rotationMat, out var invRotationMat);
+        var inputAspectRatio = inputArea.Width / inputArea.Height;
+        var outputAspectRatio = outputArea.Width / outputArea.Height;
+        Vector2 scale = Vector2.Normalize(new Vector2(inputAspectRatio/outputAspectRatio, 1f)); // correction in output space
+        
+        var correctionMatrix = transformMat * Matrix3x2.CreateScale(scale) * invTransform; // transfer correction from output to input space
 
-        return invRotationMat * Matrix3x2.CreateScale(scale);
+        return correctionMatrix;
     }
 }
