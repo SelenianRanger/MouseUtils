@@ -52,13 +52,15 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
     private TimeSpan ResetTimeSpan;
     private HPETDeltaStopwatch Stopwatch = new HPETDeltaStopwatch(true);
 
+    private float CanvasRotation;
+    private Matrix3x2 CanvasRotationMatrix;
+    private Vector2 CanvasOrigin;
     private Vector2 MinCoords;
     private Vector2 MaxCoords;
-    private float CanvasRotation;
-    private Vector2 CanvasOrigin;
-    private Matrix3x2 AspectRatioConversionRatio;
+    
+    private Matrix3x2 AspectRatioNormalizationMatrix;
     private Vector2 TabletToPhysicialCoordRatio;
-
+    
     private Vector2 LastPos;
     private Vector2 LastLocalPos;
 
@@ -155,10 +157,12 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         MinCoords /= TabletToPhysicialCoordRatio;
         MaxCoords /= TabletToPhysicialCoordRatio;
         
+        // get rotation data
         CanvasRotation = OutputMode.Input.Rotation;
-        
+        CanvasRotationMatrix = Matrix3x2.CreateRotation(Deg2Rad(CanvasRotation));
+
         // call to set initial value
-        AspectRatioConversionRatio = bNormalizeAspectRatio ? CalculateAspectRatioConversionVector() : Matrix3x2.Identity;
+        AspectRatioNormalizationMatrix = bNormalizeAspectRatio ? GetAspectRatioNormalizationVector() : Matrix3x2.Identity;
 
         return true;
     }
@@ -198,29 +202,21 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
             accelerationMultiplier = MouseAcceleration.GetMultiplier(velocity) * (float)Math.Sqrt(AccelerationIntensity) / 8; // divide to compensate for larger pen movement compared to mouse;
         }
         
-        return Vector2.Transform(displacement, AspectRatioConversionRatio) * accelerationMultiplier * SpeedMultiplier;
+        displacement = Vector2.Transform(displacement, AspectRatioNormalizationMatrix);
+        return  displacement * accelerationMultiplier * SpeedMultiplier;
     }
 
-    private Matrix3x2 CalculateAspectRatioConversionVector()
+    private Matrix3x2 GetAspectRatioNormalizationVector()
     {
-        Area outputArea = OutputMode.Output;
-        Area inputArea = OutputMode.Input;
+        DecomposeMatrix(OutputMode.TransformationMatrix, 
+            out _, out var scaleMat, out var rotationMat);
 
-        float outputAspectRatio = Math.Abs(outputArea.Width / outputArea.Height);
-        float inputAspectRatio = Math.Abs(inputArea.Width / inputArea.Height);
-        
-        Vector2 scale = (inputAspectRatio < outputAspectRatio)
-            ? new Vector2(inputAspectRatio / outputAspectRatio, 1f)
-            : new Vector2(1f, outputAspectRatio / inputAspectRatio);
-        
-        float angle = Deg2Rad(CanvasRotation);
+        Vector2 scale = (scaleMat.M11 < scaleMat.M22)
+            ? new Vector2(1f, scaleMat.M11 / scaleMat.M22)
+            : new Vector2(scaleMat.M22 / scaleMat.M11, 1f);
 
-        Matrix3x2 conversionMatrix = Matrix3x2.CreateRotation(-angle);              // rotate backwards
-        conversionMatrix = Matrix3x2.CreateScale(scale) * conversionMatrix;         // scale
-        conversionMatrix = Matrix3x2.CreateRotation(angle) * conversionMatrix;      // rotate forwards to original
-    
-        Log.Debug("Mouse Mode", conversionMatrix.ToString());
+        Matrix3x2.Invert(rotationMat, out var invRotationMat);
 
-        return conversionMatrix;
+        return invRotationMat * Matrix3x2.CreateScale(scale);
     }
 }

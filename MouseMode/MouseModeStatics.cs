@@ -88,4 +88,26 @@ public static class MouseModeStatics
     {
         return degrees * (float)Math.PI / 180f;
     }
+
+    public static void DecomposeMatrix(Matrix3x2 matrix,
+        out Matrix3x2 translation, out Matrix3x2 scale, out Matrix3x2 rotation)
+    {
+        translation = Matrix3x2.Identity;
+        scale = Matrix3x2.Identity;
+        rotation = Matrix3x2.Identity;
+        
+        // translation
+        translation.M31 = matrix.M31;   // x
+        translation.M32 = matrix.M32;   // y
+        
+        // scale
+        scale.M11 = (float)Math.Sqrt(matrix.M11 * matrix.M11 + matrix.M12 * matrix.M12);    // x
+        scale.M22 = (float)Math.Sqrt(matrix.M21 * matrix.M21 + matrix.M22 * matrix.M22);    // y
+        
+        // rotation
+        rotation.M11 = matrix.M11 / scale.M11;  //  cos
+        rotation.M12 = matrix.M12 / scale.M11;  //  sin
+        rotation.M21 = matrix.M21 / scale.M22;  // -sin
+        rotation.M22 = matrix.M22 / scale.M22;  //  cos
+    }
 }
