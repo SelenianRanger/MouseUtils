@@ -19,9 +19,9 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
          "- Zero means always reset\n")]
     public int ResetTime { get; set; }
 
-    [BooleanProperty("Drop Input Outside Full Tablet Area", ""), DefaultPropertyValue(true)]
-    public bool bDropOutOfBoundsReports { get; set; }
-    
+    [BooleanProperty("Ignore Input Outside Full Tablet Area", ""), DefaultPropertyValue(true)]
+    public bool bIgnoreOobTabletInput { get; set; }
+
     [BooleanProperty("Normalize Aspect Ratio", ""), DefaultPropertyValue(true)]
     public bool bNormalizeAspectRatio { get; set; }
 
@@ -46,16 +46,19 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
     private Vector2 DigitizerSize;
 
     private AbsoluteOutputMode? OutputMode = null;
-    private bool bAbsIgnoreOobInput;
-    private bool bAbsClampOobInput;
-    
+    private bool bIgnoreOobWorkAreaInput;
+    private bool bClampOobWorkAreaInput;
+
     private TimeSpan ResetTimeSpan;
     private HPETDeltaStopwatch Stopwatch = new HPETDeltaStopwatch(true);
 
+    private Matrix3x2 OutputTransformMatrix;
+    private Matrix3x2 OutputInverseTransformMatrix;
+
     private float CanvasRotation;
     private Vector2 CanvasOrigin;
-    private Vector2 MinCoords;
-    private Vector2 MaxCoords;
+    private Vector2 MinInputCoords;
+    private Vector2 MaxOutputCoords;
     
     private Matrix3x2 AspectRatioNormalizationMatrix;
     private Vector2 TabletToPhysicialCoordRatio;
@@ -69,14 +72,6 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         OutputMode = null;
 
         ResetTimeSpan = new TimeSpan(0, 0, 0, 0, ResetTime);
-        
-        Digitizer = TabletRef.Properties.Specifications.Digitizer;
-        DigitizerSize = new Vector2(Digitizer.Width, Digitizer.Height);
-        MaxDigitizerCoords = new Vector2(Digitizer.MaxX, Digitizer.MaxY);
-        TabletToPhysicialCoordRatio = DigitizerSize / MaxDigitizerCoords;
-
-        CanvasOrigin = MaxDigitizerCoords / 2f;
-        LastLocalPos = Vector2.Zero;
     }
     
     public void Consume(IDeviceReport report)
@@ -115,8 +110,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
 
         // calculate, scale and apply displacement
         var displacement = ScaleDisplacement(newPosition - LastPos, (float)deltaTime.TotalSeconds);
-        var transformedPos = Vector2.Clamp( LastLocalPos + CanvasOrigin + displacement,
-            Vector2.Zero, MaxDigitizerCoords);
+        var transformedPos = ClampOutput(LastLocalPos + CanvasOrigin + displacement);
 
         // save final coordinates and report
         tabletReport.Position = transformedPos;
@@ -144,41 +138,75 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
             Log.WriteNotify("Mouse Mode", "Absolute output mode not found.", LogLevel.Error);
             throw new Exception("Absolute output mode not found");
         }
-        
-        bAbsIgnoreOobInput = OutputMode.AreaLimiting;
-        bAbsClampOobInput = OutputMode.AreaClipping || bAbsIgnoreOobInput;
-        
-        var canvasSize = new Vector2(OutputMode.Input.Width, OutputMode.Input.Height);
-        MinCoords = OutputMode.Input.Position - canvasSize / 2;
-        MaxCoords = MinCoords + canvasSize;
 
-        // transform to digitizer coordinate space
-        MinCoords /= TabletToPhysicialCoordRatio;
-        MaxCoords /= TabletToPhysicialCoordRatio;
-        
-        // get rotation data
-        CanvasRotation = OutputMode.Input.Rotation;
-
-        // call to set initial value
-        AspectRatioNormalizationMatrix = bNormalizeAspectRatio ? GetAspectRatioNormalizationMatrix() : Matrix3x2.Identity;
+        InitializeVariables();
 
         return true;
     }
 
+    private void InitializeVariables()
+    {
+        // output transform matrix
+        OutputTransformMatrix = OutputMode.TransformationMatrix;
+        Matrix3x2.Invert(OutputTransformMatrix, out OutputInverseTransformMatrix);
+        
+        // tablet digitizer variables
+        Digitizer = TabletRef.Properties.Specifications.Digitizer;
+        DigitizerSize = new Vector2(Digitizer.Width, Digitizer.Height);
+        MaxDigitizerCoords = new Vector2(Digitizer.MaxX, Digitizer.MaxY);
+        
+        TabletToPhysicialCoordRatio = DigitizerSize / MaxDigitizerCoords;
+        
+        // input clamping
+        bIgnoreOobWorkAreaInput = OutputMode.AreaLimiting;
+        bClampOobWorkAreaInput = OutputMode.AreaClipping || bIgnoreOobWorkAreaInput;
+        
+        // input coordinate space variables
+        var canvasSize = new Vector2(OutputMode.Input.Width, OutputMode.Input.Height);
+        MinInputCoords = OutputMode.Input.Position - canvasSize / 2;
+        MaxOutputCoords = MinInputCoords + canvasSize;
+
+        // transform to digitizer coordinate space
+        MinInputCoords /= TabletToPhysicialCoordRatio;
+        MaxOutputCoords /= TabletToPhysicialCoordRatio;
+        
+        // canvas rotation
+        CanvasRotation = OutputMode.Input.Rotation;
+
+        // aspect ratio normalization
+        AspectRatioNormalizationMatrix = bNormalizeAspectRatio ? GetAspectRatioNormalizationMatrix() : Matrix3x2.Identity;
+        
+        // initialize relative position variables
+        LastLocalPos = Vector2.Zero;
+        
+        CanvasOrigin = OutputMode.Output.Position; // center of display area
+        CanvasOrigin = Vector2.Transform(CanvasOrigin, OutputInverseTransformMatrix); // transform to input space
+    }
+
     private Vector2 ClampInput(Vector2 pos)
     {
-        if (bDropOutOfBoundsReports && !IsWithin(pos, Vector2.Zero, MaxDigitizerCoords))
+        if (bIgnoreOobTabletInput && !IsWithin(pos, Vector2.Zero, MaxDigitizerCoords))
         {
             return Vector2.Zero;
         }
 
-        if (bAbsClampOobInput && !IsWithin(pos, MinCoords, MaxCoords, CanvasRotation))
+        if (bClampOobWorkAreaInput && !IsWithin(pos, MinInputCoords, MaxOutputCoords, CanvasRotation))
         {
-            if (bAbsIgnoreOobInput)
+            if (bIgnoreOobWorkAreaInput)
             {
                 return Vector2.Zero;
             }
-            return Clamp(pos, MinCoords, MaxCoords, CanvasRotation);
+            return Clamp(pos, MinInputCoords, MaxOutputCoords, CanvasRotation);
+        }
+        
+        return pos;
+    }
+
+    private Vector2 ClampOutput(Vector2 pos)
+    {
+        if (!IsWithin(pos, MinInputCoords, MaxOutputCoords))
+        {
+            return Clamp(pos, MinInputCoords, MaxOutputCoords, CanvasRotation);
         }
         
         return pos;
