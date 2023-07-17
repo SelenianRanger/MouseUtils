@@ -2,7 +2,7 @@ using System.Numerics;
 
 namespace MouseMode;
 
-public static class MouseModeStatics
+public static class MouseModeExtensions
 {
     /// <returns>Whether floats A and B are almost equal with the set degree of error</returns>
     public static bool IsNearly(float A, float B, float error = 0.0001f)

@@ -6,41 +6,75 @@ using OpenTabletDriver.Plugin.DependencyInjection;
 using OpenTabletDriver.Plugin.Output;
 using OpenTabletDriver.Plugin.Tablet;
 using OpenTabletDriver.Plugin.Timing;
-using static MouseMode.MouseModeStatics;
+using static MouseMode.MouseModeExtensions;
+using static MouseMode.MouseModeConstants;
 
 namespace MouseMode;
 
 [PluginName("MouseMode")]
 public class MouseMode : IPositionedPipelineElement<IDeviceReport>
 {
-    [Property("Reset Time"), Unit("ms"), DefaultPropertyValue(100), ToolTip(
-         "Time in milliseconds between reports before retaining mouse position and resetting canvas coordinates\n" +
-         "- Negative value means never reset\n" +
-         "- Zero means always reset\n")]
-    public int ResetTime { get; set; }
+    [Property(RESET_TIME_NAME), Unit("ms"), 
+     DefaultPropertyValue(RESET_TIME_DEFAULT), 
+     ToolTip("Time in milliseconds between reports before retaining mouse position and resetting canvas coordinates\n" 
+             + "- Negative value means never reset\n" 
+             + "- Zero means always reset\n")]
+    public int ResetTime
+    {
+        set => MouseModeProperties.SetDefault(RESET_TIME_INDEX, value);
+    }
 
-    [BooleanProperty("Ignore Input Outside Full Tablet Area", ""), DefaultPropertyValue(true)]
-    public bool bIgnoreOobTabletInput { get; set; }
+    [BooleanProperty(IGNORE_OOB_TABLET_INPUT_NAME, ""),
+     DefaultPropertyValue(IGNORE_OOB_TABLET_INPUT_DEFAULT)]
+    public bool bIgnoreOobTabletInput
+    {
+        set => MouseModeProperties.SetDefault(IGNORE_OOB_TABLET_INPUT_INDEX, value);
+    }
 
-    [BooleanProperty("Normalize Aspect Ratio", ""), DefaultPropertyValue(true)]
-    public bool bNormalizeAspectRatio { get; set; }
+    [BooleanProperty(NORMALIZE_ASPECT_RATIO_NAME, ""),
+     DefaultPropertyValue(NORMALIZE_ASPECT_RATIO_DEFAULT)]
+    public bool bNormalizeAspectRatio
+    {
+        set => MouseModeProperties.SetDefault(NORMALIZE_ASPECT_RATIO_INDEX, value);
+    }
 
-    [Property("Speed Multiplier"), DefaultPropertyValue(1f)]
-    public float SpeedMultiplier { get; set; }
+    [Property(SPEED_MULTIPLIER_NAME),
+     DefaultPropertyValue(SPEED_MULTIPLIER_DEFAULT)]
+    public float SpeedMultiplier
+    {
+        set => MouseModeProperties.SetDefault(SPEED_MULTIPLIER_INDEX, value);
+    }
 
-    [BooleanProperty("Use Windows Mouse Acceleration Curve", ""),
-     DefaultPropertyValue(true)]
-    public bool bMouseAccelerationEnabled { get; set; }
+    [BooleanProperty(ACCELERATION_ENABLED_NAME, ""),
+     DefaultPropertyValue(ACCELERATION_ENABLED_DEFAULT)]
+    public bool bAccelerationEnabled
+    {
+        set => MouseModeProperties.SetDefault(ACCELERATION_ENABLED_INDEX, value);
+    }
 
-    [Property("Acceleration Intensity"), DefaultPropertyValue(1f)]
-    public float AccelerationIntensity { get; set; }
-
+    [Property(ACCELERATION_INTENSITY_NAME),
+     DefaultPropertyValue(ACCELERATION_INTENSITY_DEFAULT)]
+    public float AccelerationIntensity
+    {
+        set => MouseModeProperties.SetDefault(ACCELERATION_INTENSITY_INDEX, value);
+    }
+    
     [TabletReference] 
     public TabletReference TabletRef { get; set; }
 
     [Resolved] 
     public IDriver DriverRef { get; set; }
     
+    // internal variables
+    private TimeSpan ResetTimeSpan;
+    private bool _bIgnoreOobTabletInput;
+    private bool _bNormalizeAspectRatio;
+    private float _speedMultiplier;
+    private bool _bAccelerationEnabled;
+    private float _accelerationIntensity;
+
+    private HPETDeltaStopwatch Stopwatch = new HPETDeltaStopwatch(true);
+
     private DigitizerSpecifications Digitizer;
     private Vector2 MaxDigitizerCoords;
     private Vector2 DigitizerSize;
@@ -48,10 +82,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
     private AbsoluteOutputMode? OutputMode = null;
     private bool bIgnoreOobWorkAreaInput;
     private bool bClampOobWorkAreaInput;
-
-    private TimeSpan ResetTimeSpan;
-    private HPETDeltaStopwatch Stopwatch = new HPETDeltaStopwatch(true);
-
+    
     private Matrix3x2 OutputTransformMatrix;
     private Matrix3x2 OutputInverseTransformMatrix;
 
@@ -66,12 +97,20 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
     private Vector2 LastPos;
     private Vector2 LastLocalPos;
 
+    public MouseMode()
+    {
+        MouseModeProperties.GetProperty<int>(RESET_TIME_INDEX)!.OnValueChanged += value => ResetTimeSpan = TimeSpan.FromMilliseconds(value);
+        MouseModeProperties.GetProperty<bool>(IGNORE_OOB_TABLET_INPUT_INDEX)!.OnValueChanged += value => _bIgnoreOobTabletInput = value;
+        MouseModeProperties.GetProperty<bool>(NORMALIZE_ASPECT_RATIO_INDEX)!.OnValueChanged += value => _bNormalizeAspectRatio = value;
+        MouseModeProperties.GetProperty<float>(SPEED_MULTIPLIER_INDEX)!.OnValueChanged += value => _speedMultiplier = value;
+        MouseModeProperties.GetProperty<bool>(ACCELERATION_ENABLED_INDEX)!.OnValueChanged += value => _bAccelerationEnabled = value;
+        MouseModeProperties.GetProperty<float>(ACCELERATION_INTENSITY_INDEX)!.OnValueChanged += value => _accelerationIntensity = value;
+    }
+
     [OnDependencyLoad]
     public void Recompile()
     {
         OutputMode = null;
-
-        ResetTimeSpan = new TimeSpan(0, 0, 0, 0, ResetTime);
     }
     
     public void Consume(IDeviceReport report)
@@ -103,7 +142,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
 
         // check for reset timeout
         var deltaTime = Stopwatch.Restart();
-        if (ResetTime >= 0 && deltaTime >= ResetTimeSpan)
+        if (ResetTimeSpan.TotalSeconds >= 0 && deltaTime >= ResetTimeSpan)
         {
             ResetCanvas(newPosition);
         }
@@ -132,7 +171,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
             .Where(device => device?.OutputMode?.Elements?.Contains(this) ?? false)
             .Select(device => device?.OutputMode)
             .FirstOrDefault(outputMode => outputMode is AbsoluteOutputMode);
-         
+        
         if (OutputMode == null)
         {
             Log.WriteNotify("Mouse Mode", "Absolute output mode not found.", LogLevel.Error);
@@ -174,7 +213,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         CanvasRotation = OutputMode.Input.Rotation;
 
         // aspect ratio normalization
-        AspectRatioNormalizationMatrix = bNormalizeAspectRatio ? GetAspectRatioNormalizationMatrix() : Matrix3x2.Identity;
+        AspectRatioNormalizationMatrix = _bNormalizeAspectRatio ? GetAspectRatioNormalizationMatrix() : Matrix3x2.Identity;
         
         // initialize relative position variables
         LastLocalPos = Vector2.Zero;
@@ -185,7 +224,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
 
     private Vector2 ClampInput(Vector2 pos)
     {
-        if (bIgnoreOobTabletInput && !IsWithin(pos, Vector2.Zero, MaxDigitizerCoords))
+        if (_bIgnoreOobTabletInput && !IsWithin(pos, Vector2.Zero, MaxDigitizerCoords))
         {
             return Vector2.Zero;
         }
@@ -223,12 +262,12 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
     {
         float velocity = (displacement * TabletToPhysicialCoordRatio / 25.4f).Length() / deltaTime; // convert mm/s to inch/s
         float accelerationMultiplier = 1f;
-        if (bMouseAccelerationEnabled)
+        if (_bAccelerationEnabled)
         {
-            accelerationMultiplier = MouseAcceleration.GetMultiplier(velocity) * (float)Math.Sqrt(AccelerationIntensity) / 8; // divide to compensate for larger pen movement compared to mouse;
+            accelerationMultiplier = MouseAcceleration.GetMultiplier(velocity) * (float)Math.Sqrt(_accelerationIntensity) / 8; // divide to compensate for larger pen movement compared to mouse;
         }
         
-        return  Vector2.Transform(displacement, AspectRatioNormalizationMatrix) * accelerationMultiplier * SpeedMultiplier;
+        return  Vector2.Transform(displacement, AspectRatioNormalizationMatrix) * accelerationMultiplier * _speedMultiplier;
     }
 
     private Matrix3x2 GetAspectRatioNormalizationMatrix()

@@ -1,5 +1,5 @@
 using System.Numerics;
-using static MouseMode.MouseModeStatics;
+using static MouseMode.MouseModeExtensions;
 
 namespace MouseMode;
 
