@@ -1,5 +1,3 @@
-using System.Diagnostics.CodeAnalysis;
-
 namespace MouseMode;
 
 public class ToggleableProperty<T> where T : notnull
@@ -8,35 +6,30 @@ public class ToggleableProperty<T> where T : notnull
 
     public event ValueChangedHandler? OnValueChanged;
 
-    private T DefaultValue = default!;
+    private T _defaultValue = default!;
 
-    private T Value = default!;
-    
-    public ToggleableProperty([DisallowNull]T defaultValue)
-    {
-        SetDefaultValue(defaultValue);
-    }
+    private T _value = default!;
 
-    public T GetValue() => Value;
+    public T GetValue() => _value;
 
     public void SetValue(T newValue)
     {
-        if (Value.Equals(newValue))
+        if (_value.Equals(newValue))
             return;
         
-        Value = newValue;
+        _value = newValue;
         OnValueChanged?.Invoke(newValue);
     }
     
     public void SetDefaultValue(T newValue)
     {
-        DefaultValue = newValue;
+        _defaultValue = newValue;
         SetValue(newValue);
     }
     
     public void ResetValue()
     {
-        SetValue(DefaultValue);
+        SetValue(_defaultValue);
     }
 
     /// <summary>
@@ -48,14 +41,14 @@ public class ToggleableProperty<T> where T : notnull
         // bool property toggle
         if (typeof(T) == typeof(bool))
         {
-            var boolValue = (bool)(object)Value;
+            var boolValue = (bool)(object)_value;
             SetValue((T)(object)!boolValue);
             
             return true;
         }
         
         // generic property toggle
-        if (Value.Equals(value2))
+        if (_value.Equals(value2))
         {
             ResetValue();
         }
@@ -69,7 +62,7 @@ public class ToggleableProperty<T> where T : notnull
 
     public override string ToString()
     {
-        return Value.ToString() ?? "";
+        return $"{{default: {_defaultValue}, value: {_value}}}" ?? "";
     }
     
 }

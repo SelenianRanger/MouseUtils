@@ -6,7 +6,7 @@ namespace MouseMode;
 public static class MouseAcceleration
 {
     // based on values used in windows - source: https://www.esreality.com/index.php?a=post&id=1945096
-    private static Vector2[] AccCurve = 
+    private static readonly Vector2[] AccCurve = 
     {
         new Vector2(0, 0),
         new Vector2(0.43f, 1.37f),

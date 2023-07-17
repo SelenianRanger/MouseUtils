@@ -30,38 +30,47 @@ public class MouseModeBindings : IStateBinding
     
     public void Press(TabletReference tablet, IDeviceReport report)
     {
+        var properties = MouseModeProperties.GetOrAddProperties(tablet);
         int key = Array.IndexOf(ValidChoices, PropertyChoice);
-        dynamic parsedValue;
+        int? parsedInt = null;
+        bool? parsedBool = null;
+        float? parsedFloat = null;
         switch (PropertyChoice)
         {
             case RESET_TIME_NAME: // int
-                parsedValue = int.Parse(Value);
+                parsedInt = int.Parse(Value);
                 break;
                 
             case IGNORE_OOB_TABLET_INPUT_NAME:
             case NORMALIZE_ASPECT_RATIO_NAME:
             case ACCELERATION_ENABLED_NAME: // bool
-                parsedValue = true;
+                parsedBool = true;
                 break;
                 
             case SPEED_MULTIPLIER_NAME:
             case ACCELERATION_INTENSITY_NAME: // float
-                parsedValue = float.Parse(Value);
-                break;
-            
-            default:
-                parsedValue = 0;
+                parsedFloat = float.Parse(Value);
                 break;
         }
 
         switch (ActionChoice)
         {
             case TOGGLE_ACTION:
-                MouseModeProperties.ToggleValue(key, parsedValue);
+                if(parsedInt != null)
+                    properties.ToggleValue(key, (int)parsedInt);
+                else if (parsedBool != null)
+                    properties.ToggleValue(key, (bool)parsedBool);
+                else if(parsedFloat != null)
+                    properties.ToggleValue(key, (float)parsedFloat);
                 break;
             
             case HOLD_ACTION:
-                MouseModeProperties.SetValue(key, parsedValue);
+                if(parsedInt != null)
+                    properties.SetValue(key, (int)parsedInt);
+                else if (parsedBool != null)
+                    properties.SetValue(key, (bool)parsedBool);
+                else if(parsedFloat != null)
+                    properties.SetValue(key, (float)parsedFloat);
                 break;
         }
     }
@@ -70,22 +79,23 @@ public class MouseModeBindings : IStateBinding
     {
         if (ActionChoice == TOGGLE_ACTION) return;
 
+        var properties = MouseModeProperties.GetOrAddProperties(tablet);
         int key = Array.IndexOf(ValidChoices, PropertyChoice);
         switch (PropertyChoice)
         {
             case RESET_TIME_NAME: // int
-                MouseModeProperties.ResetValue<int>(key);
+                properties.ResetValue<int>(key);
                 break;
                 
             case IGNORE_OOB_TABLET_INPUT_NAME:
             case NORMALIZE_ASPECT_RATIO_NAME:
             case ACCELERATION_ENABLED_NAME: // bool
-                MouseModeProperties.ResetValue<bool>(key);
+                properties.ResetValue<bool>(key);
                 break;
                 
             case SPEED_MULTIPLIER_NAME:
             case ACCELERATION_INTENSITY_NAME: // float
-                MouseModeProperties.ResetValue<float>(key);
+                properties.ResetValue<float>(key);
                 break;
         }
     }

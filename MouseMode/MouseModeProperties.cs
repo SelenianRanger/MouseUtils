@@ -1,53 +1,90 @@
+using System.Runtime.InteropServices;
+using OpenTabletDriver.Plugin.Tablet;
+
 namespace MouseMode;
 using static MouseModeConstants;
 
-public static class MouseModeProperties
+public class MouseModeProperties
 {
-    private static readonly Dictionary<int, object> PropertyDict = new();
 
-    static MouseModeProperties()
+    private static readonly Dictionary<TabletReference, MouseModeProperties> TabletPropertiesMap = new(new TabletComparer());
+    private readonly Dictionary<int, object> PropertyDictInstance = new();
+
+    MouseModeProperties()
     {
-        PropertyDict.Add(RESET_TIME_INDEX, new ToggleableProperty<int>(RESET_TIME_DEFAULT));
-        PropertyDict.Add(IGNORE_OOB_TABLET_INPUT_INDEX, new ToggleableProperty<bool>(IGNORE_OOB_TABLET_INPUT_DEFAULT));
-        PropertyDict.Add(NORMALIZE_ASPECT_RATIO_INDEX, new ToggleableProperty<bool>(NORMALIZE_ASPECT_RATIO_DEFAULT));
-        PropertyDict.Add(SPEED_MULTIPLIER_INDEX, new ToggleableProperty<float>(SPEED_MULTIPLIER_DEFAULT));
-        PropertyDict.Add(ACCELERATION_ENABLED_INDEX, new ToggleableProperty<bool>(ACCELERATION_ENABLED_DEFAULT));
-        PropertyDict.Add(ACCELERATION_INTENSITY_INDEX, new ToggleableProperty<float>(ACCELERATION_INTENSITY_DEFAULT));
+        PopulatePropertyDict();
     }
 
-    public static ToggleableProperty<T>? GetProperty<T>(int key) where T : notnull
+    public static MouseModeProperties GetOrAddProperties(TabletReference tabletRef)
     {
-        if (PropertyDict.TryGetValue(key, out var value) && value is ToggleableProperty<T> property)
+        lock (TabletPropertiesMap)
+        {
+            ref var propertiesInstance = ref CollectionsMarshal.GetValueRefOrAddDefault(TabletPropertiesMap, tabletRef, out var exists);
+            if (!exists)
+            {
+                propertiesInstance = new MouseModeProperties();
+            }
+
+            return propertiesInstance!;
+        }
+    }
+
+    private void PopulatePropertyDict()
+    {
+        PropertyDictInstance.Add(RESET_TIME_INDEX, new ToggleableProperty<int>());
+        PropertyDictInstance.Add(IGNORE_OOB_TABLET_INPUT_INDEX, new ToggleableProperty<bool>());
+        PropertyDictInstance.Add(NORMALIZE_ASPECT_RATIO_INDEX, new ToggleableProperty<bool>());
+        PropertyDictInstance.Add(SPEED_MULTIPLIER_INDEX, new ToggleableProperty<float>());
+        PropertyDictInstance.Add(ACCELERATION_ENABLED_INDEX, new ToggleableProperty<bool>());
+        PropertyDictInstance.Add(ACCELERATION_INTENSITY_INDEX, new ToggleableProperty<float>());
+    }
+
+    public ToggleableProperty<T>? GetProperty<T>(int key) where T : notnull
+    {
+        if (PropertyDictInstance.TryGetValue(key, out var value) && value is ToggleableProperty<T> property)
         {
             return property;
         }
-
+        
         return default;
     }
 
-    public static void SetDefault<T>(int key, T newValue) where T : notnull
+    public void SetDefault<T>(int key, T newValue) where T : notnull
     {
         GetProperty<T>(key)?.SetDefaultValue(newValue);
     }
     
-    public static T? GetValue<T>(int key) where T : notnull
+    public T? GetValue<T>(int key) where T : notnull
     {
         var property = GetProperty<T>(key);
         return property != null ? property.GetValue() : default;
     }
 
-    public static void SetValue<T>(int key, T newValue) where T : notnull
+    public void SetValue<T>(int key, T newValue) where T : notnull
     {
         GetProperty<T>(key)?.SetValue(newValue);
     }
 
-    public static void ToggleValue<T>(int key, T newValue) where T : notnull
+    public void ToggleValue<T>(int key, T newValue) where T : notnull
     {
         GetProperty<T>(key)?.ToggleValue(newValue);
     }
 
-    public static void ResetValue<T>(int key) where T : notnull
+    public void ResetValue<T>(int key) where T : notnull
     {
         GetProperty<T>(key)?.ResetValue();
+    }
+    
+    private class TabletComparer : IEqualityComparer<TabletReference>
+    {
+        public bool Equals(TabletReference? a, TabletReference? b)
+        {
+            return a?.Properties.Name == b?.Properties.Name;
+        }
+
+        public int GetHashCode(TabletReference obj)
+        {
+            return obj.Properties.Name.GetHashCode();
+        }
     }
 }

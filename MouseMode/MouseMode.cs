@@ -19,106 +19,92 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
      ToolTip("Time in milliseconds between reports before retaining mouse position and resetting canvas coordinates\n" 
              + "- Negative value means never reset\n" 
              + "- Zero means always reset\n")]
-    public int ResetTime
-    {
-        set => MouseModeProperties.SetDefault(RESET_TIME_INDEX, value);
-    }
+    public int ResetTime { get; set; }
 
     [BooleanProperty(IGNORE_OOB_TABLET_INPUT_NAME, ""),
      DefaultPropertyValue(IGNORE_OOB_TABLET_INPUT_DEFAULT)]
-    public bool bIgnoreOobTabletInput
-    {
-        set => MouseModeProperties.SetDefault(IGNORE_OOB_TABLET_INPUT_INDEX, value);
-    }
-
+    public bool bIgnoreOobTabletInput { get; set; }
+    
     [BooleanProperty(NORMALIZE_ASPECT_RATIO_NAME, ""),
      DefaultPropertyValue(NORMALIZE_ASPECT_RATIO_DEFAULT)]
-    public bool bNormalizeAspectRatio
-    {
-        set => MouseModeProperties.SetDefault(NORMALIZE_ASPECT_RATIO_INDEX, value);
-    }
+    public bool bNormalizeAspectRatio { get; set; }
 
     [Property(SPEED_MULTIPLIER_NAME),
      DefaultPropertyValue(SPEED_MULTIPLIER_DEFAULT)]
-    public float SpeedMultiplier
-    {
-        set => MouseModeProperties.SetDefault(SPEED_MULTIPLIER_INDEX, value);
-    }
+    public float SpeedMultiplier { get; set; }
 
     [BooleanProperty(ACCELERATION_ENABLED_NAME, ""),
      DefaultPropertyValue(ACCELERATION_ENABLED_DEFAULT)]
-    public bool bAccelerationEnabled
-    {
-        set => MouseModeProperties.SetDefault(ACCELERATION_ENABLED_INDEX, value);
-    }
+    public bool bAccelerationEnabled { get; set; }
 
     [Property(ACCELERATION_INTENSITY_NAME),
      DefaultPropertyValue(ACCELERATION_INTENSITY_DEFAULT)]
-    public float AccelerationIntensity
-    {
-        set => MouseModeProperties.SetDefault(ACCELERATION_INTENSITY_INDEX, value);
-    }
-    
-    [TabletReference] 
-    public TabletReference TabletRef { get; set; }
+    public float AccelerationIntensity { get; set; }
 
+    [TabletReference]
+    public TabletReference TabletRef
+    {
+        get => _tabletRef;
+        set
+        {
+            _tabletRef = value;
+            _properties = MouseModeProperties.GetOrAddProperties(value);
+        }
+    }
+
+    private TabletReference _tabletRef;
+    
     [Resolved] 
     public IDriver DriverRef { get; set; }
-    
+
     // internal variables
-    private TimeSpan ResetTimeSpan;
+    private MouseModeProperties _properties;
+    
+    private TimeSpan _resetTimeSpan;
     private bool _bIgnoreOobTabletInput;
     private bool _bNormalizeAspectRatio;
     private float _speedMultiplier;
     private bool _bAccelerationEnabled;
     private float _accelerationIntensity;
 
-    private HPETDeltaStopwatch Stopwatch = new HPETDeltaStopwatch(true);
+    private HPETDeltaStopwatch _stopwatch = new HPETDeltaStopwatch(true);
 
-    private DigitizerSpecifications Digitizer;
-    private Vector2 MaxDigitizerCoords;
-    private Vector2 DigitizerSize;
+    private DigitizerSpecifications _digitizer;
+    private Vector2 _maxDigitizerCoords;
+    private Vector2 _digitizerSize;
 
-    private AbsoluteOutputMode? OutputMode = null;
-    private bool bIgnoreOobWorkAreaInput;
-    private bool bClampOobWorkAreaInput;
+    private AbsoluteOutputMode? _outputMode;
+    private bool _bIgnoreOobWorkAreaInput;
+    private bool _bClampOobWorkAreaInput;
     
-    private Matrix3x2 OutputTransformMatrix;
-    private Matrix3x2 OutputInverseTransformMatrix;
+    private Matrix3x2 _outputTransformMatrix;
+    private Matrix3x2 _outputInverseTransformMatrix;
 
-    private float CanvasRotation;
-    private Vector2 CanvasOrigin;
-    private Vector2 MinInputCoords;
-    private Vector2 MaxOutputCoords;
+    private float _canvasRotation;
+    private Vector2 _canvasOrigin;
+    private Vector2 _minInputCoords;
+    private Vector2 _maxOutputCoords;
     
-    private Matrix3x2 AspectRatioNormalizationMatrix;
-    private Vector2 TabletToPhysicialCoordRatio;
+    private Matrix3x2 _aspectRatioNormalizationMatrix;
+    private Vector2 _tabletToPhysicalCoordRatio;
     
-    private Vector2 LastPos;
-    private Vector2 LastLocalPos;
-
-    public MouseMode()
-    {
-        MouseModeProperties.GetProperty<int>(RESET_TIME_INDEX)!.OnValueChanged += value => ResetTimeSpan = TimeSpan.FromMilliseconds(value);
-        MouseModeProperties.GetProperty<bool>(IGNORE_OOB_TABLET_INPUT_INDEX)!.OnValueChanged += value => _bIgnoreOobTabletInput = value;
-        MouseModeProperties.GetProperty<bool>(NORMALIZE_ASPECT_RATIO_INDEX)!.OnValueChanged += value => _bNormalizeAspectRatio = value;
-        MouseModeProperties.GetProperty<float>(SPEED_MULTIPLIER_INDEX)!.OnValueChanged += value => _speedMultiplier = value;
-        MouseModeProperties.GetProperty<bool>(ACCELERATION_ENABLED_INDEX)!.OnValueChanged += value => _bAccelerationEnabled = value;
-        MouseModeProperties.GetProperty<float>(ACCELERATION_INTENSITY_INDEX)!.OnValueChanged += value => _accelerationIntensity = value;
-    }
+    private Vector2 _lastPos;
+    private Vector2 _lastLocalPos;
 
     [OnDependencyLoad]
     public void Recompile()
     {
-        OutputMode = null;
+        _outputMode = null;
+        
+        InitializeProperties();
     }
-    
+
     public void Consume(IDeviceReport report)
     {
         if(report is OutOfRangeReport)
             return;
 
-        var newPosition = Vector2.Zero;
+        Vector2 newPosition;
         if (report is ITabletReport tabletReport)
         {
             newPosition = tabletReport.Position;
@@ -129,7 +115,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
             return;
         }
 
-        if (OutputMode == null && !TryGetOutputMode())
+        if (_outputMode == null && !TryGetOutputMode())
         {
             Emit?.Invoke(report);
             return;
@@ -141,38 +127,60 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
             return;
 
         // check for reset timeout
-        var deltaTime = Stopwatch.Restart();
-        if (ResetTimeSpan.TotalSeconds >= 0 && deltaTime >= ResetTimeSpan)
+        var deltaTime = _stopwatch.Restart();
+        if (_resetTimeSpan.TotalSeconds >= 0 && deltaTime >= _resetTimeSpan)
         {
             ResetCanvas(newPosition);
         }
 
         // calculate, scale and apply displacement
-        var displacement = ScaleDisplacement(newPosition - LastPos, (float)deltaTime.TotalSeconds);
-        var transformedPos = ClampOutput(LastLocalPos + CanvasOrigin + displacement);
-
+        var displacement = ScaleDisplacement(newPosition - _lastPos, (float)deltaTime.TotalSeconds);
+        var transformedPos = ClampOutput(_lastLocalPos + _canvasOrigin + displacement);
+        
         // save final coordinates and report
         tabletReport.Position = transformedPos;
         Emit?.Invoke(tabletReport);
 
-        LastPos = newPosition;
-        LastLocalPos = transformedPos - CanvasOrigin;
+        _lastPos = newPosition;
+        _lastLocalPos = transformedPos - _canvasOrigin;
     }
 
     public event Action<IDeviceReport>? Emit;
     public PipelinePosition Position => PipelinePosition.PreTransform;
 
+    private void InitializeProperties()
+    {
+        SubscribeToPropertyChanges();
+
+        _properties.SetDefault(RESET_TIME_INDEX, ResetTime);
+        _properties.SetDefault(IGNORE_OOB_TABLET_INPUT_INDEX, bIgnoreOobTabletInput);
+        _properties.SetDefault(NORMALIZE_ASPECT_RATIO_INDEX, bNormalizeAspectRatio);
+        _properties.SetDefault(SPEED_MULTIPLIER_INDEX, SpeedMultiplier);
+        _properties.SetDefault(ACCELERATION_ENABLED_INDEX, bAccelerationEnabled);
+        _properties.SetDefault(ACCELERATION_INTENSITY_INDEX, AccelerationIntensity);
+    }
+    
+    private void SubscribeToPropertyChanges()
+    {
+        _properties.GetProperty<int>(RESET_TIME_INDEX)!.OnValueChanged += value => _resetTimeSpan = TimeSpan.FromMilliseconds(value);
+        _properties.GetProperty<bool>(IGNORE_OOB_TABLET_INPUT_INDEX)!.OnValueChanged += value => _bIgnoreOobTabletInput = value;
+        _properties.GetProperty<bool>(NORMALIZE_ASPECT_RATIO_INDEX)!.OnValueChanged += value => _bNormalizeAspectRatio = value;
+        _properties.GetProperty<float>(SPEED_MULTIPLIER_INDEX)!.OnValueChanged += value => _speedMultiplier = value;
+        _properties.GetProperty<bool>(ACCELERATION_ENABLED_INDEX)!.OnValueChanged += value => _bAccelerationEnabled = value;
+        _properties.GetProperty<float>(ACCELERATION_INTENSITY_INDEX)!.OnValueChanged += value => _accelerationIntensity = value;
+    }
+    
     private bool TryGetOutputMode()
     {
         if (DriverRef is not Driver drv)
             return false;
         
-        OutputMode = (AbsoluteOutputMode?)drv.InputDevices
+        _outputMode = (AbsoluteOutputMode?)drv.InputDevices
             .Where(device => device?.OutputMode?.Elements?.Contains(this) ?? false)
             .Select(device => device?.OutputMode)
             .FirstOrDefault(outputMode => outputMode is AbsoluteOutputMode);
         
-        if (OutputMode == null)
+        if (_outputMode == null)
         {
             Log.WriteNotify("Mouse Mode", "Absolute output mode not found.", LogLevel.Error);
             throw new Exception("Absolute output mode not found");
@@ -186,56 +194,56 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
     private void InitializeVariables()
     {
         // output transform matrix
-        OutputTransformMatrix = OutputMode.TransformationMatrix;
-        Matrix3x2.Invert(OutputTransformMatrix, out OutputInverseTransformMatrix);
+        _outputTransformMatrix = _outputMode.TransformationMatrix;
+        Matrix3x2.Invert(_outputTransformMatrix, out _outputInverseTransformMatrix);
         
         // tablet digitizer variables
-        Digitizer = TabletRef.Properties.Specifications.Digitizer;
-        DigitizerSize = new Vector2(Digitizer.Width, Digitizer.Height);
-        MaxDigitizerCoords = new Vector2(Digitizer.MaxX, Digitizer.MaxY);
+        _digitizer = TabletRef.Properties.Specifications.Digitizer;
+        _digitizerSize = new Vector2(_digitizer.Width, _digitizer.Height);
+        _maxDigitizerCoords = new Vector2(_digitizer.MaxX, _digitizer.MaxY);
         
-        TabletToPhysicialCoordRatio = DigitizerSize / MaxDigitizerCoords;
+        _tabletToPhysicalCoordRatio = _digitizerSize / _maxDigitizerCoords;
         
         // input clamping
-        bIgnoreOobWorkAreaInput = OutputMode.AreaLimiting;
-        bClampOobWorkAreaInput = OutputMode.AreaClipping || bIgnoreOobWorkAreaInput;
+        _bIgnoreOobWorkAreaInput = _outputMode.AreaLimiting;
+        _bClampOobWorkAreaInput = _outputMode.AreaClipping || _bIgnoreOobWorkAreaInput;
         
         // input coordinate space variables
-        var canvasSize = new Vector2(OutputMode.Input.Width, OutputMode.Input.Height);
-        MinInputCoords = OutputMode.Input.Position - canvasSize / 2;
-        MaxOutputCoords = MinInputCoords + canvasSize;
+        var canvasSize = new Vector2(_outputMode.Input.Width, _outputMode.Input.Height);
+        _minInputCoords = _outputMode.Input.Position - canvasSize / 2;
+        _maxOutputCoords = _minInputCoords + canvasSize;
 
         // transform to digitizer coordinate space
-        MinInputCoords /= TabletToPhysicialCoordRatio;
-        MaxOutputCoords /= TabletToPhysicialCoordRatio;
+        _minInputCoords /= _tabletToPhysicalCoordRatio;
+        _maxOutputCoords /= _tabletToPhysicalCoordRatio;
         
         // canvas rotation
-        CanvasRotation = OutputMode.Input.Rotation;
+        _canvasRotation = _outputMode.Input.Rotation;
 
         // aspect ratio normalization
-        AspectRatioNormalizationMatrix = _bNormalizeAspectRatio ? GetAspectRatioNormalizationMatrix() : Matrix3x2.Identity;
+        _aspectRatioNormalizationMatrix = _bNormalizeAspectRatio ? GetAspectRatioNormalizationMatrix() : Matrix3x2.Identity;
         
         // initialize relative position variables
-        LastLocalPos = Vector2.Zero;
+        _lastLocalPos = Vector2.Zero;
         
-        CanvasOrigin = OutputMode.Output.Position; // center of display area
-        CanvasOrigin = Vector2.Transform(CanvasOrigin, OutputInverseTransformMatrix); // transform to input space
+        _canvasOrigin = _outputMode.Output.Position; // center of display area
+        _canvasOrigin = Vector2.Transform(_canvasOrigin, _outputInverseTransformMatrix); // transform to input space
     }
 
     private Vector2 ClampInput(Vector2 pos)
     {
-        if (_bIgnoreOobTabletInput && !IsWithin(pos, Vector2.Zero, MaxDigitizerCoords))
+        if (_bIgnoreOobTabletInput && !IsWithin(pos, Vector2.Zero, _maxDigitizerCoords))
         {
             return Vector2.Zero;
         }
 
-        if (bClampOobWorkAreaInput && !IsWithin(pos, MinInputCoords, MaxOutputCoords, CanvasRotation))
+        if (_bClampOobWorkAreaInput && !IsWithin(pos, _minInputCoords, _maxOutputCoords, _canvasRotation))
         {
-            if (bIgnoreOobWorkAreaInput)
+            if (_bIgnoreOobWorkAreaInput)
             {
                 return Vector2.Zero;
             }
-            return Clamp(pos, MinInputCoords, MaxOutputCoords, CanvasRotation);
+            return Clamp(pos, _minInputCoords, _maxOutputCoords, _canvasRotation);
         }
         
         return pos;
@@ -243,9 +251,9 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
 
     private Vector2 ClampOutput(Vector2 pos)
     {
-        if (!IsWithin(pos, MinInputCoords, MaxOutputCoords))
+        if (!IsWithin(pos, _minInputCoords, _maxOutputCoords))
         {
-            return Clamp(pos, MinInputCoords, MaxOutputCoords, CanvasRotation);
+            return Clamp(pos, _minInputCoords, _maxOutputCoords, _canvasRotation);
         }
         
         return pos;
@@ -253,30 +261,30 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
 
     private void ResetCanvas(Vector2 currentPosition)
     {
-        LastPos = currentPosition;
-        CanvasOrigin = LastLocalPos + CanvasOrigin;
-        LastLocalPos = Vector2.Zero;
+        _lastPos = currentPosition;
+        _canvasOrigin = _lastLocalPos + _canvasOrigin;
+        _lastLocalPos = Vector2.Zero;
     }
 
     private Vector2 ScaleDisplacement(Vector2 displacement, float deltaTime)
     {
-        float velocity = (displacement * TabletToPhysicialCoordRatio / 25.4f).Length() / deltaTime; // convert mm/s to inch/s
+        float velocity = (displacement * _tabletToPhysicalCoordRatio / 25.4f).Length() / deltaTime; // convert mm/s to inch/s
         float accelerationMultiplier = 1f;
         if (_bAccelerationEnabled)
         {
             accelerationMultiplier = MouseAcceleration.GetMultiplier(velocity) * (float)Math.Sqrt(_accelerationIntensity) / 8; // divide to compensate for larger pen movement compared to mouse;
         }
         
-        return  Vector2.Transform(displacement, AspectRatioNormalizationMatrix) * accelerationMultiplier * _speedMultiplier;
+        return  Vector2.Transform(displacement, _aspectRatioNormalizationMatrix) * accelerationMultiplier * _speedMultiplier;
     }
 
     private Matrix3x2 GetAspectRatioNormalizationMatrix()
     {
-        var transformMat = OutputMode.TransformationMatrix with { M31 = 0, M32 = 0 }; // get output linear transform
+        var transformMat = _outputMode.TransformationMatrix with { M31 = 0, M32 = 0 }; // get output linear transform
         Matrix3x2.Invert(transformMat, out var invTransform);
 
-        var inputArea = OutputMode.Input;
-        var outputArea = OutputMode.Output;
+        var inputArea = _outputMode.Input;
+        var outputArea = _outputMode.Output;
 
         var inputAspectRatio = inputArea.Width / inputArea.Height;
         var outputAspectRatio = outputArea.Width / outputArea.Height;
