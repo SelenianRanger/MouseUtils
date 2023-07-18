@@ -15,14 +15,16 @@ public class MouseModeProperties
         PopulatePropertyDict();
     }
 
-    public static MouseModeProperties GetOrAddProperties(TabletReference tabletRef)
+    public static MouseModeProperties GetOrAddProperties(TabletReference tabletRef, out bool found)
     {
+        found = true;
         lock (TabletPropertiesMap)
         {
             ref var propertiesInstance = ref CollectionsMarshal.GetValueRefOrAddDefault(TabletPropertiesMap, tabletRef, out var exists);
             if (!exists)
             {
                 propertiesInstance = new MouseModeProperties();
+                found = false;
             }
 
             return propertiesInstance!;

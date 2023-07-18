@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using OpenTabletDriver;
 using OpenTabletDriver.Plugin;
@@ -48,7 +49,15 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         set
         {
             _tabletRef = value;
-            _properties = MouseModeProperties.GetOrAddProperties(value);
+            _properties = MouseModeProperties.GetOrAddProperties(value, out var found);
+            if (found)
+            {
+                GetInitialPropertyValues();
+            }
+            else
+            {
+                SubscribeToPropertyChanges(); // only done the first time properties are created
+            }
         }
     }
 
@@ -59,7 +68,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
 
     // internal variables
     private MouseModeProperties _properties;
-    
+
     private TimeSpan _resetTimeSpan;
     private bool _bIgnoreOobTabletInput;
     private bool _bNormalizeAspectRatio;
@@ -101,26 +110,22 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
 
     public void Consume(IDeviceReport report)
     {
-        if(report is OutOfRangeReport)
-            return;
-
-        Vector2 newPosition;
-        if (report is ITabletReport tabletReport)
-        {
-            newPosition = tabletReport.Position;
-        }
-        else
+        if (!IsValidReport(report, out var tabletReport))
         {
             Emit?.Invoke(report);
-            return;
-        }
-
-        if (_outputMode == null && !TryGetOutputMode())
-        {
-            Emit?.Invoke(report);
-            return;
+            return; 
         }
         
+        Vector2 newPosition= tabletReport.Position;
+
+        // manually set to absolute mode
+        if (_resetTimeSpan == TimeSpan.Zero)
+        {
+            ResetCanvas(newPosition, true);
+            Emit?.Invoke(report);
+            return; 
+        }
+
         // clamp and drop invalid reports
         newPosition = ClampInput(newPosition);
         if(newPosition == Vector2.Zero)
@@ -128,7 +133,7 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
 
         // check for reset timeout
         var deltaTime = _stopwatch.Restart();
-        if (_resetTimeSpan.TotalSeconds >= 0 && deltaTime >= _resetTimeSpan)
+        if (_resetTimeSpan.TotalSeconds > 0 && deltaTime >= _resetTimeSpan)
         {
             ResetCanvas(newPosition);
         }
@@ -148,10 +153,28 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
     public event Action<IDeviceReport>? Emit;
     public PipelinePosition Position => PipelinePosition.PreTransform;
 
+    private void SubscribeToPropertyChanges()
+    {
+        _properties.GetProperty<int>(RESET_TIME_INDEX)!.OnValueChanged += (_, value) => _resetTimeSpan = TimeSpan.FromMilliseconds(value);
+        _properties.GetProperty<bool>(IGNORE_OOB_TABLET_INPUT_INDEX)!.OnValueChanged += (_, value) => _bIgnoreOobTabletInput = value;
+        _properties.GetProperty<bool>(NORMALIZE_ASPECT_RATIO_INDEX)!.OnValueChanged += (_, value) => _bNormalizeAspectRatio = value;
+        _properties.GetProperty<float>(SPEED_MULTIPLIER_INDEX)!.OnValueChanged += (_, value) => _speedMultiplier = value;
+        _properties.GetProperty<bool>(ACCELERATION_ENABLED_INDEX)!.OnValueChanged += (_, value) => _bAccelerationEnabled = value;
+        _properties.GetProperty<float>(ACCELERATION_INTENSITY_INDEX)!.OnValueChanged += (_, value) => _accelerationIntensity = value;
+    }
+    
+    private void GetInitialPropertyValues()
+    {
+        _resetTimeSpan = TimeSpan.FromMilliseconds(_properties.GetValue<int>(RESET_TIME_INDEX));
+        _bIgnoreOobTabletInput = _properties.GetValue<bool>(IGNORE_OOB_TABLET_INPUT_INDEX);
+        _bNormalizeAspectRatio = _properties.GetValue<bool>(NORMALIZE_ASPECT_RATIO_INDEX);
+        _speedMultiplier = _properties.GetValue<float>(SPEED_MULTIPLIER_INDEX);
+        _bAccelerationEnabled = _properties.GetValue<bool>(ACCELERATION_ENABLED_INDEX);
+        _accelerationIntensity = _properties.GetValue<float>(ACCELERATION_INTENSITY_INDEX);
+    }
+    
     private void InitializeProperties()
     {
-        SubscribeToPropertyChanges();
-
         _properties.SetDefault(RESET_TIME_INDEX, ResetTime);
         _properties.SetDefault(IGNORE_OOB_TABLET_INPUT_INDEX, bIgnoreOobTabletInput);
         _properties.SetDefault(NORMALIZE_ASPECT_RATIO_INDEX, bNormalizeAspectRatio);
@@ -159,15 +182,20 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         _properties.SetDefault(ACCELERATION_ENABLED_INDEX, bAccelerationEnabled);
         _properties.SetDefault(ACCELERATION_INTENSITY_INDEX, AccelerationIntensity);
     }
-    
-    private void SubscribeToPropertyChanges()
+
+    private bool IsValidReport(IDeviceReport report,[NotNullWhen(true)] out ITabletReport? tabletReport)
     {
-        _properties.GetProperty<int>(RESET_TIME_INDEX)!.OnValueChanged += value => _resetTimeSpan = TimeSpan.FromMilliseconds(value);
-        _properties.GetProperty<bool>(IGNORE_OOB_TABLET_INPUT_INDEX)!.OnValueChanged += value => _bIgnoreOobTabletInput = value;
-        _properties.GetProperty<bool>(NORMALIZE_ASPECT_RATIO_INDEX)!.OnValueChanged += value => _bNormalizeAspectRatio = value;
-        _properties.GetProperty<float>(SPEED_MULTIPLIER_INDEX)!.OnValueChanged += value => _speedMultiplier = value;
-        _properties.GetProperty<bool>(ACCELERATION_ENABLED_INDEX)!.OnValueChanged += value => _bAccelerationEnabled = value;
-        _properties.GetProperty<float>(ACCELERATION_INTENSITY_INDEX)!.OnValueChanged += value => _accelerationIntensity = value;
+        tabletReport = null;
+        // invalid report
+        if (report is not ITabletReport newReport)
+            return false;
+        tabletReport = newReport;
+
+        // no reference to output mode
+        if (_outputMode == null && !TryGetOutputMode())
+            return false;
+
+        return true;
     }
     
     private bool TryGetOutputMode()
@@ -229,6 +257,13 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         _canvasOrigin = _outputMode.Output.Position; // center of display area
         _canvasOrigin = Vector2.Transform(_canvasOrigin, _outputInverseTransformMatrix); // transform to input space
     }
+    
+    private void ResetCanvas(Vector2 currentPosition, bool resetToAbsolute = false)
+    {
+        _lastPos = currentPosition;
+        _canvasOrigin = resetToAbsolute ? currentPosition : _lastLocalPos + _canvasOrigin;
+        _lastLocalPos = Vector2.Zero;
+    }
 
     private Vector2 ClampInput(Vector2 pos)
     {
@@ -257,13 +292,6 @@ public class MouseMode : IPositionedPipelineElement<IDeviceReport>
         }
         
         return pos;
-    }
-
-    private void ResetCanvas(Vector2 currentPosition)
-    {
-        _lastPos = currentPosition;
-        _canvasOrigin = _lastLocalPos + _canvasOrigin;
-        _lastLocalPos = Vector2.Zero;
     }
 
     private Vector2 ScaleDisplacement(Vector2 displacement, float deltaTime)

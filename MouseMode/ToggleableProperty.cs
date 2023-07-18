@@ -1,10 +1,20 @@
+using OpenTabletDriver.Plugin;
+
 namespace MouseMode;
 
 public class ToggleableProperty<T> where T : notnull
 {
-    public delegate void ValueChangedHandler(T newValue);
-
-    public event ValueChangedHandler? OnValueChanged;
+    private EventHandler<T>? _eventHandler;
+    public event EventHandler<T>? OnValueChanged
+    {
+        add
+        {
+            _eventHandler += value;
+            value?.Invoke(this, _value);
+        }
+        
+        remove => _eventHandler -= value;
+    }
 
     private T _defaultValue = default!;
 
@@ -17,8 +27,10 @@ public class ToggleableProperty<T> where T : notnull
         if (_value.Equals(newValue))
             return;
         
+        Log.Write("Mouse Mode", $"{newValue}");
+        
         _value = newValue;
-        OnValueChanged?.Invoke(newValue);
+        _eventHandler?.Invoke(this, newValue);
     }
     
     public void SetDefaultValue(T newValue)

@@ -30,7 +30,7 @@ public class MouseModeBindings : IStateBinding
     
     public void Press(TabletReference tablet, IDeviceReport report)
     {
-        var properties = MouseModeProperties.GetOrAddProperties(tablet);
+        var properties = MouseModeProperties.GetOrAddProperties(tablet, out _);
         int key = Array.IndexOf(ValidChoices, PropertyChoice);
         int? parsedInt = null;
         bool? parsedBool = null;
@@ -79,7 +79,7 @@ public class MouseModeBindings : IStateBinding
     {
         if (ActionChoice == TOGGLE_ACTION) return;
 
-        var properties = MouseModeProperties.GetOrAddProperties(tablet);
+        var properties = MouseModeProperties.GetOrAddProperties(tablet, out _);
         int key = Array.IndexOf(ValidChoices, PropertyChoice);
         switch (PropertyChoice)
         {
