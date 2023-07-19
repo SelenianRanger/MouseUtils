@@ -22,54 +22,54 @@ public class ToggleableProperty<T> where T : notnull
 
     public T GetValue() => _value;
 
-    public void SetValue(T newValue)
+    public T SetValue(T newValue)
     {
         if (_value.Equals(newValue))
-            return;
-        
-        Log.Write("Mouse Mode", $"{newValue}");
-        
+            return _value;
+
         _value = newValue;
         _eventHandler?.Invoke(this, newValue);
+
+        return _value;
     }
     
-    public void SetDefaultValue(T newValue)
+    public T SetDefaultValue(T newValue)
     {
         _defaultValue = newValue;
-        SetValue(newValue);
+        return SetValue(newValue);
     }
     
-    public void ResetValue()
+    public T ResetValue()
     {
-        SetValue(_defaultValue);
+        return SetValue(_defaultValue);
     }
 
     /// <summary>
     /// tried to toggle the property value as a bool, if not possible toggles the value between value2, and default value
     /// </summary>
-    /// <returns>whether toggling as a bool succeeded or not</returns>
-    public bool ToggleValue(T value2)
+    public T ToggleValue(T value2)
     {
         // bool property toggle
         if (typeof(T) == typeof(bool))
         {
             var boolValue = (bool)(object)_value;
-            SetValue((T)(object)!boolValue);
-            
-            return true;
-        }
-        
-        // generic property toggle
-        if (_value.Equals(value2))
-        {
-            ResetValue();
-        }
-        else
-        {
-            SetValue(value2);
+            return SetValue((T)(object)!boolValue);
         }
 
-        return false;
+        // generic property toggle
+        return _value.Equals(value2) ? ResetValue() : SetValue(value2);
+    }
+
+    public void UnsubscribeObject(object target)
+    {
+        if (_eventHandler?.GetInvocationList() == null)
+            return;
+        
+        foreach (var delegateInst in _eventHandler?.GetInvocationList()!)
+        {
+            if (delegateInst.Target != target) continue;
+            _eventHandler -= (EventHandler<T>)delegateInst;
+        }
     }
 
     public override string ToString()

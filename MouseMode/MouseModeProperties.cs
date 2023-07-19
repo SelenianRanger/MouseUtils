@@ -8,7 +8,7 @@ public class MouseModeProperties
 {
 
     private static readonly Dictionary<TabletReference, MouseModeProperties> TabletPropertiesMap = new(new TabletComparer());
-    private readonly Dictionary<int, object> PropertyDictInstance = new();
+    private readonly Dictionary<PropertyIndex, object> _propertyDictInstance = new();
 
     MouseModeProperties()
     {
@@ -33,17 +33,17 @@ public class MouseModeProperties
 
     private void PopulatePropertyDict()
     {
-        PropertyDictInstance.Add(RESET_TIME_INDEX, new ToggleableProperty<int>());
-        PropertyDictInstance.Add(IGNORE_OOB_TABLET_INPUT_INDEX, new ToggleableProperty<bool>());
-        PropertyDictInstance.Add(NORMALIZE_ASPECT_RATIO_INDEX, new ToggleableProperty<bool>());
-        PropertyDictInstance.Add(SPEED_MULTIPLIER_INDEX, new ToggleableProperty<float>());
-        PropertyDictInstance.Add(ACCELERATION_ENABLED_INDEX, new ToggleableProperty<bool>());
-        PropertyDictInstance.Add(ACCELERATION_INTENSITY_INDEX, new ToggleableProperty<float>());
+        _propertyDictInstance.Add(PropertyIndex.ResetTime, new ToggleableProperty<int>());
+        _propertyDictInstance.Add(PropertyIndex.IgnoreOobTabletInput, new ToggleableProperty<bool>());
+        _propertyDictInstance.Add(PropertyIndex.NormalizeAspectRatio, new ToggleableProperty<bool>());
+        _propertyDictInstance.Add(PropertyIndex.SpeedMultiplier, new ToggleableProperty<float>());
+        _propertyDictInstance.Add(PropertyIndex.AccelerationEnabled, new ToggleableProperty<bool>());
+        _propertyDictInstance.Add(PropertyIndex.AccelerationIntensity, new ToggleableProperty<float>());
     }
 
-    public ToggleableProperty<T>? GetProperty<T>(int key) where T : notnull
+    public ToggleableProperty<T>? GetProperty<T>(PropertyIndex key) where T : notnull
     {
-        if (PropertyDictInstance.TryGetValue(key, out var value) && value is ToggleableProperty<T> property)
+        if (_propertyDictInstance.TryGetValue(key, out var value) && value is ToggleableProperty<T> property)
         {
             return property;
         }
@@ -51,30 +51,65 @@ public class MouseModeProperties
         return default;
     }
 
-    public void SetDefault<T>(int key, T newValue) where T : notnull
+    public T? SetDefault<T>(PropertyIndex key, T newValue) where T : notnull
     {
-        GetProperty<T>(key)?.SetDefaultValue(newValue);
+        var property = GetProperty<T>(key);
+        return property != null ? property.SetDefaultValue(newValue) : default;
     }
     
-    public T? GetValue<T>(int key) where T : notnull
+    public T? GetValue<T>(PropertyIndex key) where T : notnull
     {
         var property = GetProperty<T>(key);
         return property != null ? property.GetValue() : default;
     }
 
-    public void SetValue<T>(int key, T newValue) where T : notnull
+    public T? SetValue<T>(PropertyIndex key, T newValue) where T : notnull
     {
-        GetProperty<T>(key)?.SetValue(newValue);
+        var property = GetProperty<T>(key);
+        return property != null ? property.SetValue(newValue) : default;
     }
 
-    public void ToggleValue<T>(int key, T newValue) where T : notnull
+    public T? ToggleValue<T>(PropertyIndex key, T newValue) where T : notnull
     {
-        GetProperty<T>(key)?.ToggleValue(newValue);
+        var property = GetProperty<T>(key);
+        return property != null ? property.ToggleValue(newValue) : default;
     }
 
-    public void ResetValue<T>(int key) where T : notnull
+    public T? ResetValue<T>(PropertyIndex key) where T : notnull
     {
-        GetProperty<T>(key)?.ResetValue();
+        var property = GetProperty<T>(key);
+        return property != null ? property.ResetValue() : default;
+    }
+
+    public void UnsubscribeFromAll(object target)
+    {
+        UnsubscribeFromProperty(PropertyIndex.ResetTime, target);
+        UnsubscribeFromProperty(PropertyIndex.IgnoreOobTabletInput, target);
+        UnsubscribeFromProperty(PropertyIndex.NormalizeAspectRatio, target);
+        UnsubscribeFromProperty(PropertyIndex.SpeedMultiplier, target);
+        UnsubscribeFromProperty(PropertyIndex.AccelerationEnabled, target);
+        UnsubscribeFromProperty(PropertyIndex.AccelerationIntensity, target);
+    }
+
+    public void UnsubscribeFromProperty(PropertyIndex key, object target)
+    {
+        switch (key)
+        {
+            case PropertyIndex.ResetTime: // int
+                (_propertyDictInstance[key] as ToggleableProperty<int>)?.UnsubscribeObject(target);
+                break;
+            
+            case PropertyIndex.IgnoreOobTabletInput:
+            case PropertyIndex.NormalizeAspectRatio:
+            case PropertyIndex.AccelerationEnabled: // bool
+                (_propertyDictInstance[key] as ToggleableProperty<bool>)?.UnsubscribeObject(target);
+                break;
+            
+            case PropertyIndex.SpeedMultiplier:
+            case PropertyIndex.AccelerationIntensity: // float
+                (_propertyDictInstance[key] as ToggleableProperty<float>)?.UnsubscribeObject(target);
+                break;
+        }
     }
     
     private class TabletComparer : IEqualityComparer<TabletReference>
