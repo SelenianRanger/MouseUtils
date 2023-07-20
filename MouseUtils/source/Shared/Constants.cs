@@ -1,6 +1,6 @@
-namespace MouseMode;
+namespace MouseUtils;
 
-public static class MouseModeConstants
+public static class Constants
 {
     public const string RESET_TIME_NAME = "Reset Time";
     public const int RESET_TIME_DEFAULT = 100;
@@ -13,11 +13,8 @@ public static class MouseModeConstants
     
     public const string SPEED_MULTIPLIER_NAME = "Speed Multiplier";
     public const float SPEED_MULTIPLIER_DEFAULT = 1f;
-    
-    public const string ACCELERATION_ENABLED_NAME = "Use Windows Mouse Acceleration Curve";
-    public const bool ACCELERATION_ENABLED_DEFAULT = true;
-    
-    public const string ACCELERATION_INTENSITY_NAME = "Acceleration Intensity";
+
+    public const string ACCELERATION_INTENSITY_NAME = "Windows Mouse Acceleration Intensity";
     public const float ACCELERATION_INTENSITY_DEFAULT = 1f;
     
     public enum PropertyIndex
@@ -26,17 +23,23 @@ public static class MouseModeConstants
         IgnoreOobTabletInput,
         NormalizeAspectRatio,
         SpeedMultiplier,
-        AccelerationEnabled,
         AccelerationIntensity
     }
-    
+
     public static readonly string[] PropertyNames =
     {
         RESET_TIME_NAME,
         IGNORE_OOB_TABLET_INPUT_NAME,
         NORMALIZE_ASPECT_RATIO_NAME,
         SPEED_MULTIPLIER_NAME,
-        ACCELERATION_ENABLED_NAME,
         ACCELERATION_INTENSITY_NAME
+    };
+    
+    public static readonly string[] Abs2RelPropertyNames =
+    {
+        RESET_TIME_NAME,
+        IGNORE_OOB_TABLET_INPUT_NAME,
+        NORMALIZE_ASPECT_RATIO_NAME,
+        SPEED_MULTIPLIER_NAME
     };
 }

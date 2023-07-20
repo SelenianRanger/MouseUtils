@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MouseMode", "MouseMode\MouseMode.csproj", "{D13729DA-E882-4D2B-BD43-3CA07E1A2B06}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MouseUtils", "MouseUtils\MouseUtils.csproj", "{D13729DA-E882-4D2B-BD43-3CA07E1A2B06}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenTabletDriver.Plugin", ".modules\OpenTabletDriver\OpenTabletDriver.Plugin\OpenTabletDriver.Plugin.csproj", "{272B176F-6E2B-4406-A85E-6460A5552471}"
 EndProject

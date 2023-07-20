@@ -1,21 +1,21 @@
 using System.Runtime.InteropServices;
 using OpenTabletDriver.Plugin.Tablet;
 
-namespace MouseMode;
-using static MouseModeConstants;
+namespace MouseUtils;
+using static Constants;
 
-public class MouseModeProperties
+public class Properties
 {
 
-    private static readonly Dictionary<TabletReference, MouseModeProperties> TabletPropertiesMap = new(new TabletComparer());
+    private static readonly Dictionary<TabletReference, Properties> TabletPropertiesMap = new(new TabletComparer());
     private readonly Dictionary<PropertyIndex, object> _propertyDictInstance = new();
 
-    MouseModeProperties()
+    Properties()
     {
         PopulatePropertyDict();
     }
 
-    public static MouseModeProperties GetOrAddProperties(TabletReference tabletRef, out bool found)
+    public static Properties GetOrAddProperties(TabletReference tabletRef, out bool found)
     {
         found = true;
         lock (TabletPropertiesMap)
@@ -23,7 +23,7 @@ public class MouseModeProperties
             ref var propertiesInstance = ref CollectionsMarshal.GetValueRefOrAddDefault(TabletPropertiesMap, tabletRef, out var exists);
             if (!exists)
             {
-                propertiesInstance = new MouseModeProperties();
+                propertiesInstance = new Properties();
                 found = false;
             }
 
@@ -37,7 +37,6 @@ public class MouseModeProperties
         _propertyDictInstance.Add(PropertyIndex.IgnoreOobTabletInput, new ToggleableProperty<bool>());
         _propertyDictInstance.Add(PropertyIndex.NormalizeAspectRatio, new ToggleableProperty<bool>());
         _propertyDictInstance.Add(PropertyIndex.SpeedMultiplier, new ToggleableProperty<float>());
-        _propertyDictInstance.Add(PropertyIndex.AccelerationEnabled, new ToggleableProperty<bool>());
         _propertyDictInstance.Add(PropertyIndex.AccelerationIntensity, new ToggleableProperty<float>());
     }
 
@@ -87,7 +86,6 @@ public class MouseModeProperties
         UnsubscribeFromProperty(PropertyIndex.IgnoreOobTabletInput, target);
         UnsubscribeFromProperty(PropertyIndex.NormalizeAspectRatio, target);
         UnsubscribeFromProperty(PropertyIndex.SpeedMultiplier, target);
-        UnsubscribeFromProperty(PropertyIndex.AccelerationEnabled, target);
         UnsubscribeFromProperty(PropertyIndex.AccelerationIntensity, target);
     }
 
@@ -100,8 +98,7 @@ public class MouseModeProperties
                 break;
             
             case PropertyIndex.IgnoreOobTabletInput:
-            case PropertyIndex.NormalizeAspectRatio:
-            case PropertyIndex.AccelerationEnabled: // bool
+            case PropertyIndex.NormalizeAspectRatio: // bool
                 (_propertyDictInstance[key] as ToggleableProperty<bool>)?.UnsubscribeObject(target);
                 break;
             

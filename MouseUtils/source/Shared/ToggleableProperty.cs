@@ -1,6 +1,4 @@
-using OpenTabletDriver.Plugin;
-
-namespace MouseMode;
+namespace MouseUtils;
 
 public class ToggleableProperty<T> where T : notnull
 {

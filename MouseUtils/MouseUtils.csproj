@@ -11,4 +11,8 @@
       <ProjectReference Include="..\.modules\OpenTabletDriver\OpenTabletDriver\OpenTabletDriver.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="source\" />
+    </ItemGroup>
+
 </Project>

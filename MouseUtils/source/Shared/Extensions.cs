@@ -1,8 +1,9 @@
 using System.Numerics;
+using OpenTabletDriver.Plugin.Tablet;
 
-namespace MouseMode;
+namespace MouseUtils;
 
-public static class MouseModeExtensions
+public static class Extensions
 {
     /// <returns>Whether floats A and B are almost equal with the set degree of error</returns>
     public static bool IsNearly(float A, float B, float error = 0.0001f)
@@ -58,7 +59,7 @@ public static class MouseModeExtensions
         {
             return Vector2.Clamp(P, pivot - Flip(XY) / 2, pivot + Flip(XY) / 2);
         }
-        
+
         float rot = Deg2Rad(rotation);
         
         Vector2 A = X + XY with { Y = 0f };
@@ -77,6 +78,14 @@ public static class MouseModeExtensions
         float clampedY = Math.Clamp(Vector2.Dot(XBrot, XProt) / XBrot.Length(), 0f, XBrot.Length());
         
         return clampedX * Vector2.Normalize(XArot) + clampedY * Vector2.Normalize(XBrot) + Xrot;
+    }
+
+    public static Vector2 GetTabletToPhysicalRatio(TabletReference tablet)
+    {
+        var digitizer = tablet.Properties.Specifications.Digitizer;
+        var digitizerSize = new Vector2(digitizer.Width, digitizer.Height);
+        var maxDigitizerCoords = new Vector2(digitizer.MaxX, digitizer.MaxY);
+        return digitizerSize / maxDigitizerCoords;
     }
 
     public static Vector2 Flip(Vector2 vector)
