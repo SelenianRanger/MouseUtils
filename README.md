@@ -41,6 +41,8 @@ Applies a subtle acceleration to your movements, directly mimicking the method b
 
 This filter works both with Abs2Rel in absolute mode, and on its own in relative mode. (but it does nothing on its own in absolute mode)
 
+**\*Note\* if you use a plugin such as VMulti to emulate a mouse, windows will apply its own acceleration on top of this fitler. You may want to disable it in mouse settings as mentioned above.**
+
 ### Parameters
 #### Acceleration Intensity
 Similar to speed multiplier, this parameter scales your movement speed. However it has a square root scale meaning it scales up slower the higher value you set it. You can disable the acceleration by setting the intensity to zero (via a binding for example).
