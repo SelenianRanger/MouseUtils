@@ -5,7 +5,7 @@ public static class Constants
     public const string RESET_TIME_NAME = "Reset Time";
     public const int RESET_TIME_DEFAULT = 100;
     
-    public const string IGNORE_OOB_TABLET_INPUT_NAME = "Ignore Input Outside Full Tablet Area";
+    public const string IGNORE_OOB_TABLET_INPUT_NAME = "Ignore Input Outside Physical Tablet Area";
     public const bool IGNORE_OOB_TABLET_INPUT_DEFAULT = true;
     
     public const string NORMALIZE_ASPECT_RATIO_NAME = "Normalize Aspect Ratio";

@@ -53,9 +53,8 @@ public abstract class BindingBase : IStateBinding
             HOLD_ACTION => OnHold(report, out propertyIndex),
             _ => 0f
         };
-
-        if(bShowNotif)
-            ShowNotif(propertyIndex, newValue);
+        
+        LogVariableChange(propertyIndex, newValue);
     }
 
     public void Release(TabletReference tablet, IDeviceReport report)
@@ -67,15 +66,14 @@ public abstract class BindingBase : IStateBinding
         
         var newValue = OnRelease(report, out var propertyIndex);
         
-        if(bShowNotif)
-            ShowNotif(propertyIndex, newValue, true);
+        LogVariableChange(propertyIndex, newValue, true);
     }
 
     protected abstract float OnToggle(IDeviceReport report, out PropertyIndex updatedPropertyIndex);
     protected abstract float OnHold(IDeviceReport report, out PropertyIndex updatedPropertyIndex);
     protected abstract float OnRelease(IDeviceReport report, out PropertyIndex updatedPropertyIndex);
     
-    private static void ShowNotif(PropertyIndex propertyIndex, float newValue, bool reset = false)
+    private void LogVariableChange(PropertyIndex propertyIndex, float newValue, bool reset = false)
     {
         string valueStr;
         switch (propertyIndex)
@@ -100,6 +98,7 @@ public abstract class BindingBase : IStateBinding
         }
 
         var message = $"{PropertyNames[(int)propertyIndex]} was {(reset ? "reset" : "set")} to {valueStr}";
-        Log.WriteNotify("Mouse Utils", message);
+        Log.Write("Mouse Utils", message, notify:bShowNotif);
+        
     }
 }

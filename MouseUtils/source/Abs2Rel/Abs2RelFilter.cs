@@ -15,7 +15,7 @@ public class Abs2RelFilter : FilterBase
 {
     [Property(RESET_TIME_NAME), Unit("ms"), 
      DefaultPropertyValue(RESET_TIME_DEFAULT), 
-     ToolTip("Time in milliseconds between reports before retaining mouse position and resetting canvas coordinates\n" 
+     ToolTip("Time in milliseconds between reports before retaining mouse position\n" 
              + "- Zero means never reset\n" 
              + "- Negative values reverts input to absolute mode\n")]
     public int ResetTime { get; set; }
@@ -144,7 +144,7 @@ public class Abs2RelFilter : FilterBase
         _maxOutputCoords /= _tabletToPhysicalCoordRatio;
 
         // aspect ratio normalization
-        _aspectRatioNormalizationMatrix = _bNormalizeAspectRatio ? GetAspectRatioNormalizationMatrix() : Matrix3x2.Identity;
+        _aspectRatioNormalizationMatrix = GetAspectRatioNormalizationMatrix();
         
         // initialize relative position variables
         _lastLocalPos = Vector2.Zero;
@@ -212,8 +212,9 @@ public class Abs2RelFilter : FilterBase
         {
             accelerationMultiplier = WindowsMouseAcceleration.GetMultiplier(velocity) * (float)Math.Sqrt(_accelerationIntensity);
         }
-        
-        return  Vector2.Transform(displacement, _aspectRatioNormalizationMatrix) * accelerationMultiplier * _speedMultiplier;
+
+        var correctionMatrix = _bNormalizeAspectRatio ? _aspectRatioNormalizationMatrix : Matrix3x2.Identity;
+        return  Vector2.Transform(displacement, correctionMatrix) * accelerationMultiplier * _speedMultiplier;
     }
 
     private Matrix3x2 GetAspectRatioNormalizationMatrix()

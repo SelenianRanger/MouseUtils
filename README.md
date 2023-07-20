@@ -24,11 +24,11 @@ Every single parameter you can set in the plugin's settings, you can bind to a b
 #### Reset Time
 Time in milliseconds between pen inputs before treating movements as a new relative stroke. Setting this value to zero disables this resetting, resulting in every new report shifting the input by the distance travelled between points. Setting this value to negative values effectively disables relative travel mode (you can use a toggle binding with this value to move the cursor to somewhere before turning relative mode back on).
 
-#### Ignore Input Outside Full Tablet Area
-In my tests, I found that the tablet has huge margins of error moving the pen completely outside the tablet area. This feature simply ignores all those inputs to remain precise with movement. This feature is separate from the clamping and limiting options you can set on your work area.
+#### Ignore Reports Outside Physical Tablet Area
+In my tests, I found that the tablet has huge margins of error moving the pen right outside edges of the physical tablet area. This feature simply ignores all those inputs to remain precise with movement. This feature is separate from the clamping and limiting options you can set on your work area.
 
 #### Normalize Aspect Ratio
-This feature normalizes your input in such a way that if you draw something on the tablet, that shape is transferred 1:1 to your display. When disabled, depending on how you setup your tablet and display areas, your input may end up stretched or squished.
+This feature normalizes your input in such a way that if you draw something on the tablet, that shape is transferred without any stretching to your display. When disabled, depending on how you setup your tablet and display areas, your input may end up stretched or squished.
 
 #### Speed Multiplier
 A direct multiplier to your movement speed. Keep in mind that the base speed of the cursor is dependant on the size of your tablet and display areas.
